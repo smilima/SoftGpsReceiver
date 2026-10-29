@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EphemerisPage</class>
+ <widget class="QWidget" name="EphemerisPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>900</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex"><number>0</number></property>
+     <widget class="QWidget" name="ephTab">
+      <attribute name="title"><string>Ephemeris (subframes 1-3)</string></attribute>
+      <layout class="QVBoxLayout" name="ephLayout">
+       <item><widget class="QLabel" name="ephInfoLabel"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Broadcast ephemeris and clock parameters for every tracked satellite, in ICD units and converted to SI units, with derived orbit quantities.</string></property></widget></item>
+       <item><widget class="gui::DataTable" name="ephTable"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="almTab">
+      <attribute name="title"><string>Almanac</string></attribute>
+      <layout class="QVBoxLayout" name="almLayout">
+       <item><widget class="QLabel" name="almInfoLabel"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Almanac pages (subframe 5 pages 1-24, subframe 4 pages 2-5 and 7-10) decoded from any tracked satellite. A complete almanac takes 12.5 minutes; a short recording contains only a few pages.</string></property></widget></item>
+       <item><widget class="gui::DataTable" name="almTable"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="healthTab">
+      <attribute name="title"><string>Health &amp;&amp; configuration</string></attribute>
+      <layout class="QVBoxLayout" name="healthLayout">
+       <item><widget class="QLabel" name="healthInfoLabel"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Satellite health from three sources: the 6-bit health in subframe 1 (own ephemeris), the 8-bit almanac health, and the 6-bit health summaries of subframe 5 page 25 / subframe 4 page 25, plus the anti-spoofing flag and SV configuration code.</string></property></widget></item>
+       <item><widget class="gui::DataTable" name="healthTable"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="ionoTab">
+      <attribute name="title"><string>Iono / UTC &amp;&amp; other pages</string></attribute>
+      <layout class="QVBoxLayout" name="ionoLayout">
+       <item>
+        <widget class="QSplitter" name="ionoSplitter">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <widget class="QGroupBox" name="ionoGroup">
+          <property name="title"><string>Ionospheric (Klobuchar) and UTC parameters - subframe 4 page 18</string></property>
+          <layout class="QVBoxLayout" name="ionoGroupLayout">
+           <item><widget class="gui::DataTable" name="ionoTable"/></item>
+          </layout>
+         </widget>
+         <widget class="QGroupBox" name="messageGroup">
+          <property name="title"><string>Special message - subframe 4 page 17</string></property>
+          <layout class="QVBoxLayout" name="messageLayout">
+           <item><widget class="QLabel" name="messageLabel"><property name="text"><string>-</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+          </layout>
+         </widget>
+         <widget class="QGroupBox" name="nmctGroup">
+          <property name="title"><string>Navigation Message Correction Table (estimated range deviations, m) - subframe 4 page 13</string></property>
+          <layout class="QVBoxLayout" name="nmctLayout">
+           <item><widget class="gui::DataTable" name="nmctTable"/></item>
+          </layout>
+         </widget>
+         <widget class="QGroupBox" name="pagesGroup">
+          <property name="title"><string>Subframe 4/5 pages received</string></property>
+          <layout class="QVBoxLayout" name="pagesLayout">
+           <item><widget class="gui::DataTable" name="pagesTable"/></item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

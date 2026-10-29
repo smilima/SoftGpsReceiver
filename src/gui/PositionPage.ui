@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PositionPage</class>
+ <widget class="QWidget" name="PositionPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>1000</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex"><number>0</number></property>
+     <!-- ============================================================ Summary & plots -->
+     <widget class="QWidget" name="summaryTab">
+      <attribute name="title"><string>Summary &amp;&amp; plots</string></attribute>
+      <layout class="QHBoxLayout" name="summaryTabLayout">
+       <item>
+        <widget class="QSplitter" name="summarySplitter">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         <widget class="QGroupBox" name="summaryGroup">
+          <property name="minimumSize"><size><width>420</width><height>0</height></size></property>
+          <property name="title"><string>Solution summary</string></property>
+          <layout class="QVBoxLayout" name="summaryGroupLayout">
+           <item>
+            <layout class="QFormLayout" name="summaryForm">
+             <item row="0" column="0"><widget class="QLabel" name="latLabel"><property name="text"><string>Latitude:</string></property></widget></item>
+             <item row="0" column="1"><widget class="QLabel" name="latValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="1" column="0"><widget class="QLabel" name="lonLabel"><property name="text"><string>Longitude:</string></property></widget></item>
+             <item row="1" column="1"><widget class="QLabel" name="lonValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="2" column="0"><widget class="QLabel" name="heightLabel"><property name="text"><string>Height (ellipsoid):</string></property></widget></item>
+             <item row="2" column="1"><widget class="QLabel" name="heightValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="3" column="0"><widget class="QLabel" name="ecefLabel"><property name="text"><string>ECEF:</string></property></widget></item>
+             <item row="3" column="1"><widget class="QLabel" name="ecefValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="4" column="0"><widget class="QLabel" name="utmLabel"><property name="text"><string>UTM:</string></property></widget></item>
+             <item row="4" column="1"><widget class="QLabel" name="utmValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="5" column="0"><widget class="QLabel" name="stdLabel"><property name="text"><string>Std. dev. E / N / U:</string></property></widget></item>
+             <item row="5" column="1"><widget class="QLabel" name="stdValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="6" column="0"><widget class="QLabel" name="cepLabel"><property name="text"><string>CEP50 / 2DRMS / SEP50:</string></property></widget></item>
+             <item row="6" column="1"><widget class="QLabel" name="cepValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="7" column="0"><widget class="QLabel" name="dopLabel"><property name="text"><string>Satellites / PDOP / HDOP:</string></property></widget></item>
+             <item row="7" column="1"><widget class="QLabel" name="dopValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="8" column="0"><widget class="QLabel" name="velLabel"><property name="text"><string>Mean velocity E / N / U:</string></property></widget></item>
+             <item row="8" column="1"><widget class="QLabel" name="velValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="9" column="0"><widget class="QLabel" name="biasLabel"><property name="text"><string>Clock bias drift:</string></property></widget></item>
+             <item row="9" column="1"><widget class="QLabel" name="biasValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="10" column="0"><widget class="QLabel" name="driftLabel"><property name="text"><string>Doppler clock drift:</string></property></widget></item>
+             <item row="10" column="1"><widget class="QLabel" name="driftValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="11" column="0"><widget class="QLabel" name="ifLabel"><property name="text"><string>Effective IF:</string></property></widget></item>
+             <item row="11" column="1"><widget class="QLabel" name="ifValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="12" column="0"><widget class="QLabel" name="signLabel"><property name="text"><string>Doppler sign:</string></property></widget></item>
+             <item row="12" column="1"><widget class="QLabel" name="signValue"><property name="text"><string>-</string></property></widget></item>
+             <item row="13" column="0"><widget class="QLabel" name="timeLabel"><property name="text"><string>GPS time:</string></property></widget></item>
+             <item row="13" column="1"><widget class="QLabel" name="timeValue"><property name="text"><string>-</string></property></widget></item>
+            </layout>
+           </item>
+           <item><widget class="QPushButton" name="mapButton"><property name="text"><string>Show on OpenStreetMap</string></property></widget></item>
+           <item><widget class="QPushButton" name="exportCsvButton"><property name="text"><string>Export solutions to CSV...</string></property></widget></item>
+           <item><widget class="QPushButton" name="exportKmlButton"><property name="text"><string>Export track to KML (Google Earth)...</string></property></widget></item>
+           <item>
+            <spacer name="summarySpacer">
+             <property name="orientation"><enum>Qt::Vertical</enum></property>
+             <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="plotsWidget">
+          <layout class="QGridLayout" name="plotsGrid">
+           <item row="0" column="0">
+            <widget class="gui::PlotWidget" name="horizontalPlot" native="true">
+             <property name="title" stdset="0"><string>Horizontal scatter about the mean position</string></property>
+             <property name="xLabel" stdset="0"><string>East (m)</string></property>
+             <property name="yLabel" stdset="0"><string>North (m)</string></property>
+             <property name="aspectLocked" stdset="0"><bool>true</bool></property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="gui::PlotWidget" name="enuPlot" native="true">
+             <property name="title" stdset="0"><string>Position error E / N / U vs time</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>m</string></property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="gui::PlotWidget" name="biasPlot" native="true">
+             <property name="title" stdset="0"><string>Receiver clock bias (sample-clock time scale)</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>m</string></property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="gui::PlotWidget" name="driftPlot" native="true">
+             <property name="title" stdset="0"><string>Receiver clock drift from Doppler (includes front-end frequency offset)</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>m/s</string></property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="gui::PlotWidget" name="dopPlot" native="true">
+             <property name="title" stdset="0"><string>Dilution of precision</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>DOP</string></property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="gui::PlotWidget" name="satsPlot" native="true">
+             <property name="title" stdset="0"><string>Satellites used and residual RMS</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>count / m</string></property>
+            </widget>
+           </item>
+           <item row="3" column="0" colspan="2">
+            <widget class="gui::PlotWidget" name="velocityPlot" native="true">
+             <property name="title" stdset="0"><string>Velocity from Doppler (E / N / U)</string></property>
+             <property name="xLabel" stdset="0"><string>GPS time of week (s)</string></property>
+             <property name="yLabel" stdset="0"><string>m/s</string></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Solutions -->
+     <widget class="QWidget" name="solutionsTab">
+      <attribute name="title"><string>Solutions</string></attribute>
+      <layout class="QVBoxLayout" name="solutionsLayout">
+       <item><widget class="gui::DataTable" name="solutionsTable"/></item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Least squares -->
+     <widget class="QWidget" name="lsqTab">
+      <attribute name="title"><string>Least-squares detail</string></attribute>
+      <layout class="QVBoxLayout" name="lsqLayout">
+       <item>
+        <layout class="QHBoxLayout" name="lsqControls">
+         <item><widget class="QLabel" name="epochLabel"><property name="text"><string>Epoch</string></property></widget></item>
+         <item><widget class="QSlider" name="epochSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property></widget></item>
+         <item><widget class="QSpinBox" name="epochSpin"/></item>
+         <item>
+          <widget class="QLabel" name="epochInfoLabel">
+           <property name="text"><string>-</string></property>
+           <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QSplitter" name="lsqSplitter">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <widget class="QGroupBox" name="iterGroup">
+          <property name="title"><string>Gauss-Newton iterations: dx = (H'WH)^-1 H'W (rho_corr - rho_model)</string></property>
+          <layout class="QVBoxLayout" name="iterLayout">
+           <item><widget class="gui::DataTable" name="iterTable"/></item>
+          </layout>
+         </widget>
+         <widget class="QSplitter" name="matrixSplitter">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <widget class="QGroupBox" name="designGroup">
+           <property name="title"><string>Design matrix H (final iteration) and residuals</string></property>
+           <layout class="QVBoxLayout" name="designLayout">
+            <item><widget class="gui::DataTable" name="designTable"/></item>
+           </layout>
+          </widget>
+          <widget class="QGroupBox" name="cofactorGroup">
+           <property name="title"><string>Cofactor matrix Q = (H'H)^-1 in local E/N/U/clock frame</string></property>
+           <layout class="QVBoxLayout" name="cofactorLayout">
+            <item><widget class="gui::DataTable" name="cofactorTable"/></item>
+           </layout>
+          </widget>
+          <widget class="gui::PlotWidget" name="convergencePlot" native="true">
+           <property name="title" stdset="0"><string>Convergence: |dx| per iteration</string></property>
+           <property name="xLabel" stdset="0"><string>Iteration</string></property>
+           <property name="yLabel" stdset="0"><string>log10 |dx| (m)</string></property>
+          </widget>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>epochSlider</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>epochSpin</receiver>
+   <slot>setValue(int)</slot>
+  </connection>
+  <connection>
+   <sender>epochSpin</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>epochSlider</receiver>
+   <slot>setValue(int)</slot>
+  </connection>
+ </connections>
+</ui>

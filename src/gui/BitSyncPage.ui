@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BitSyncPage</class>
+ <widget class="QWidget" name="BitSyncPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>1000</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <layout class="QHBoxLayout" name="controlsLayout">
+     <item><widget class="QLabel" name="channelLabel"><property name="text"><string>Channel</string></property></widget></item>
+     <item><widget class="QComboBox" name="channelCombo"><property name="minimumSize"><size><width>160</width><height>0</height></size></property></widget></item>
+     <item><widget class="QLabel" name="infoLabel"><property name="text"><string>   Bit synchronisation by histogram of prompt sign changes (mod 20 ms); bits = sum of 20 prompt values; preamble 10001011 verified by TLM/HOW parity</string></property></widget></item>
+     <item>
+      <spacer name="controlsSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <widget class="QWidget" name="plotsWidget">
+      <layout class="QGridLayout" name="plotsGrid">
+       <item row="0" column="0">
+        <widget class="gui::PlotWidget" name="histPlot" native="true">
+         <property name="title" stdset="0"><string>Histogram of I_P sign transitions vs ms mod 20</string></property>
+         <property name="xLabel" stdset="0"><string>ms within the 20-ms bit</string></property>
+         <property name="yLabel" stdset="0"><string>Transitions</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1" colspan="2">
+        <widget class="gui::PlotWidget" name="promptPlot" native="true">
+         <property name="title" stdset="0"><string>Prompt I with detected bit boundaries</string></property>
+         <property name="xLabel" stdset="0"><string>Tracking ms</string></property>
+         <property name="yLabel" stdset="0"><string>I_P</string></property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="gui::PlotWidget" name="softPlot" native="true">
+         <property name="title" stdset="0"><string>Integrated (soft) navigation bits</string></property>
+         <property name="xLabel" stdset="0"><string>Bit index</string></property>
+         <property name="yLabel" stdset="0"><string>Sum of 20 I_P</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="gui::PlotWidget" name="softHistPlot" native="true">
+         <property name="title" stdset="0"><string>Soft-bit distribution (bimodal = clean bit decisions)</string></property>
+         <property name="xLabel" stdset="0"><string>Soft bit value</string></property>
+         <property name="yLabel" stdset="0"><string>Count</string></property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QGroupBox" name="summaryGroup">
+         <property name="title"><string>Bit synchronisation summary</string></property>
+         <layout class="QVBoxLayout" name="summaryLayout">
+          <item><widget class="gui::DataTable" name="summaryTable"/></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="3">
+        <widget class="gui::PlotWidget" name="preamblePlot" native="true">
+         <property name="title" stdset="0"><string>Correlation of the bit stream with the preamble (+/-8 = match, red = parity-verified subframe start)</string></property>
+         <property name="xLabel" stdset="0"><string>Bit index</string></property>
+         <property name="yLabel" stdset="0"><string>Correlation</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QGroupBox" name="bitsGroup">
+      <property name="title"><string>Raw bit stream as received (30 bits per row = one word when aligned; preamble highlighted)</string></property>
+      <layout class="QVBoxLayout" name="bitsLayout">
+       <item><widget class="gui::DataTable" name="bitsTable"/></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,100 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(SoftGpsReceiver VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
+qt_standard_project_setup()
+
+# Sources are UTF-8 (degree signs etc.)
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
+# The signal-processing core processes ~10^9 samples per channel. Without
+# optimisation a Debug build is unusably slow, so by default the core is
+# optimised even in Debug builds (the GUI stays fully debuggable).
+option(GNSS_OPTIMIZE_CORE_IN_DEBUG "Optimise the DSP core even in Debug builds" ON)
+
+# ---------------------------------------------------------------------------
+# Core library: everything that does not need a GUI
+# ---------------------------------------------------------------------------
+add_library(gnsscore STATIC
+    src/core/Constants.h
+    src/core/MathUtil.h
+    src/core/Settings.h            src/core/Settings.cpp
+    src/core/SignalSource.h        src/core/SignalSource.cpp
+    src/core/Fft.h                 src/core/Fft.cpp
+    src/core/CaCode.h              src/core/CaCode.cpp
+    src/core/SignalAnalysis.h      src/core/SignalAnalysis.cpp
+    src/core/Acquisition.h         src/core/Acquisition.cpp
+    src/core/Tracking.h            src/core/Tracking.cpp
+    src/core/NavMessage.h          src/core/NavMessage.cpp
+    src/core/Ephemeris.h           src/core/Ephemeris.cpp
+    src/core/Geodesy.h             src/core/Geodesy.cpp
+    src/core/Pvt.h                 src/core/Pvt.cpp
+    src/core/Receiver.h            src/core/Receiver.cpp
+)
+target_include_directories(gnsscore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(gnsscore PUBLIC Qt6::Core Qt6::Concurrent)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(gnsscore PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(gnsscore PRIVATE -fcx-limited-range)
+    endif()
+    if(GNSS_OPTIMIZE_CORE_IN_DEBUG)
+        target_compile_options(gnsscore PRIVATE $<$<CONFIG:Debug>:-O2>)
+    endif()
+    target_compile_options(gnsscore PRIVATE $<$<NOT:$<CONFIG:Debug>>:-O3>)
+elseif(MSVC)
+    target_compile_options(gnsscore PRIVATE /W3 $<$<NOT:$<CONFIG:Debug>>:/O2>)
+endif()
+
+# ---------------------------------------------------------------------------
+# GUI application. Every page, the main window and the settings dialog are
+# Qt Designer forms (.ui) - open them in Qt Creator to edit the layout. The
+# plots/tables are promoted widgets (gui::PlotWidget, gui::DataTable,
+# gui::SkyPlotWidget); plot titles and axis labels are dynamic properties
+# (title, xLabel, yLabel) that can be edited in Designer.
+# ---------------------------------------------------------------------------
+option(GNSS_BUILD_GUI "Build the Qt Widgets application" ON)
+if(GNSS_BUILD_GUI)
+qt_add_executable(SoftGpsReceiver WIN32 MACOSX_BUNDLE
+    src/main.cpp
+    src/gui/MainWindow.h           src/gui/MainWindow.cpp         src/gui/MainWindow.ui
+    src/gui/SettingsDialog.h       src/gui/SettingsDialog.cpp     src/gui/SettingsDialog.ui
+    src/gui/OverviewPage.h         src/gui/OverviewPage.cpp       src/gui/OverviewPage.ui
+    src/gui/RawSignalPage.h        src/gui/RawSignalPage.cpp      src/gui/RawSignalPage.ui
+    src/gui/CaCodePage.h           src/gui/CaCodePage.cpp         src/gui/CaCodePage.ui
+    src/gui/AcquisitionPage.h      src/gui/AcquisitionPage.cpp    src/gui/AcquisitionPage.ui
+    src/gui/TrackingPage.h         src/gui/TrackingPage.cpp       src/gui/TrackingPage.ui
+    src/gui/BitSyncPage.h          src/gui/BitSyncPage.cpp        src/gui/BitSyncPage.ui
+    src/gui/NavMessagePage.h       src/gui/NavMessagePage.cpp     src/gui/NavMessagePage.ui
+    src/gui/EphemerisPage.h        src/gui/EphemerisPage.cpp      src/gui/EphemerisPage.ui
+    src/gui/SatellitesPage.h       src/gui/SatellitesPage.cpp     src/gui/SatellitesPage.ui
+    src/gui/MeasurementsPage.h     src/gui/MeasurementsPage.cpp   src/gui/MeasurementsPage.ui
+    src/gui/PositionPage.h         src/gui/PositionPage.cpp       src/gui/PositionPage.ui
+    src/gui/PlotWidget.h           src/gui/PlotWidget.cpp
+    src/gui/SkyPlotWidget.h        src/gui/SkyPlotWidget.cpp
+    src/gui/DataTable.h            src/gui/DataTable.cpp
+    src/gui/GuiUtil.h              src/gui/GuiUtil.cpp
+)
+qt_add_resources(SoftGpsReceiver "docs"
+    PREFIX "/"
+    FILES docs/algorithms.html
+)
+target_include_directories(SoftGpsReceiver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
+target_link_libraries(SoftGpsReceiver PRIVATE gnsscore Qt6::Widgets Qt6::Gui)
+endif()
+# ---------------------------------------------------------------------------
+# Command line front end (batch processing / regression testing)
+# ---------------------------------------------------------------------------
+qt_add_executable(gnss_cli src/cli/main_cli.cpp)
+target_link_libraries(gnss_cli PRIVATE gnsscore)

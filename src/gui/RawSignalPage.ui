@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RawSignalPage</class>
+ <widget class="QWidget" name="RawSignalPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>900</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <layout class="QHBoxLayout" name="controlsLayout">
+     <item><widget class="QLabel" name="startLabel"><property name="text"><string>Start</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="startSpin">
+       <property name="suffix"><string> ms</string></property>
+       <property name="decimals"><number>1</number></property>
+       <property name="maximum"><double>10000000.000000000000000</double></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="lengthLabel"><property name="text"><string>Length</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="lengthSpin">
+       <property name="suffix"><string> ms</string></property>
+       <property name="decimals"><number>1</number></property>
+       <property name="minimum"><double>1.000000000000000</double></property>
+       <property name="maximum"><double>60000.000000000000000</double></property>
+       <property name="value"><double>100.000000000000000</double></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="samplesLabel"><property name="text"><string>Time plot samples</string></property></widget></item>
+     <item>
+      <widget class="QSpinBox" name="samplesSpin">
+       <property name="minimum"><number>16</number></property>
+       <property name="maximum"><number>1000000</number></property>
+       <property name="value"><number>400</number></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="fftLabel"><property name="text"><string>FFT size</string></property></widget></item>
+     <item>
+      <widget class="QComboBox" name="fftCombo">
+       <property name="currentIndex"><number>4</number></property>
+       <item><property name="text"><string>512</string></property></item>
+       <item><property name="text"><string>1024</string></property></item>
+       <item><property name="text"><string>2048</string></property></item>
+       <item><property name="text"><string>4096</string></property></item>
+       <item><property name="text"><string>8192</string></property></item>
+       <item><property name="text"><string>16384</string></property></item>
+       <item><property name="text"><string>32768</string></property></item>
+       <item><property name="text"><string>65536</string></property></item>
+      </widget>
+     </item>
+     <item><widget class="QPushButton" name="analyseButton"><property name="text"><string>Analyse</string></property></widget></item>
+     <item><widget class="QLabel" name="slicesLabel"><property name="text"><string>    Spectrogram time slices</string></property></widget></item>
+     <item>
+      <widget class="QSpinBox" name="slicesSpin">
+       <property name="minimum"><number>10</number></property>
+       <property name="maximum"><number>2000</number></property>
+       <property name="value"><number>200</number></property>
+      </widget>
+     </item>
+     <item><widget class="QPushButton" name="wholeFileButton"><property name="text"><string>Spectrogram of whole file</string></property></widget></item>
+     <item>
+      <spacer name="controlsSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <widget class="QWidget" name="plotsWidget">
+      <layout class="QGridLayout" name="plotsGrid">
+       <item row="0" column="0">
+        <widget class="gui::PlotWidget" name="timePlot" native="true">
+         <property name="title" stdset="0"><string>Raw samples (time domain)</string></property>
+         <property name="xLabel" stdset="0"><string>Time (us)</string></property>
+         <property name="yLabel" stdset="0"><string>Sample value</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="gui::PlotWidget" name="histPlot" native="true">
+         <property name="title" stdset="0"><string>Sample value histogram (ADC level usage)</string></property>
+         <property name="xLabel" stdset="0"><string>Sample value</string></property>
+         <property name="yLabel" stdset="0"><string>Probability</string></property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="gui::PlotWidget" name="psdPlot" native="true">
+         <property name="title" stdset="0"><string>Power spectral density (Welch, Hann window, 50% overlap)</string></property>
+         <property name="xLabel" stdset="0"><string>Frequency (MHz)</string></property>
+         <property name="yLabel" stdset="0"><string>PSD (dB/Hz)</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="gui::PlotWidget" name="specPlot" native="true">
+         <property name="title" stdset="0"><string>Spectrogram</string></property>
+         <property name="xLabel" stdset="0"><string>Frequency (MHz)</string></property>
+         <property name="yLabel" stdset="0"><string>Time (s)</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QGroupBox" name="statsGroup">
+      <property name="minimumSize"><size><width>420</width><height>0</height></size></property>
+      <property name="title"><string>Statistics</string></property>
+      <layout class="QVBoxLayout" name="statsLayout">
+       <item><widget class="gui::DataTable" name="statsTable"/></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

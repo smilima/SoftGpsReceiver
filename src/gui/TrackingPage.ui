@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TrackingPage</class>
+ <widget class="QWidget" name="TrackingPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>1000</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex"><number>0</number></property>
+     <!-- ============================================================ Channel detail -->
+     <widget class="QWidget" name="channelTab">
+      <attribute name="title"><string>Channel detail</string></attribute>
+      <layout class="QVBoxLayout" name="channelLayout">
+       <item>
+        <layout class="QHBoxLayout" name="channelControls">
+         <item><widget class="QLabel" name="channelLabel"><property name="text"><string>Channel</string></property></widget></item>
+         <item><widget class="QComboBox" name="channelCombo"><property name="minimumSize"><size><width>160</width><height>0</height></size></property></widget></item>
+         <item><widget class="QCheckBox" name="linkCheck"><property name="text"><string>Link time axes</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item><widget class="QLabel" name="skipLabel"><property name="text"><string>    Constellation: skip first</string></property></widget></item>
+         <item>
+          <widget class="QSpinBox" name="skipSpin">
+           <property name="suffix"><string> ms</string></property>
+           <property name="maximum"><number>100000</number></property>
+           <property name="value"><number>1000</number></property>
+          </widget>
+         </item>
+         <item><widget class="QLabel" name="hintLabel"><property name="text"><string>    Wheel = zoom, left-drag = box zoom, right-drag = pan, double-click = reset</string></property></widget></item>
+         <item>
+          <spacer name="channelSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="plotScroll">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="plotScrollContents">
+          <layout class="QGridLayout" name="plotGrid">
+           <item row="0" column="0">
+            <widget class="gui::PlotWidget" name="iqPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Discrete-time scatter of prompt (I, Q)</string></property>
+             <property name="xLabel" stdset="0"><string>I prompt</string></property>
+             <property name="yLabel" stdset="0"><string>Q prompt</string></property>
+             <property name="aspectLocked" stdset="0"><bool>true</bool></property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="gui::PlotWidget" name="promptPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Prompt correlator outputs (navigation bits in I)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>Correlation</string></property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="gui::PlotWidget" name="eplPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Early / prompt / late envelopes</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>|correlation|</string></property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="gui::PlotWidget" name="pllPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>PLL (Costas) discriminator atan(Q/I)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>Phase error (rad)</string></property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="gui::PlotWidget" name="dopplerPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Carrier NCO frequency - IF (Doppler)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>Hz</string></property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="gui::PlotWidget" name="fllPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>FLL discriminator (assist during pull-in)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>Frequency error (Hz)</string></property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="gui::PlotWidget" name="dllPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>DLL discriminator (normalised E-L envelope)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>Code error (chips)</string></property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="gui::PlotWidget" name="codePlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Code NCO: code frequency - 1.023 MHz</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>chips/s (Hz)</string></property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="gui::PlotWidget" name="cn0Plot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>C/N0 (M2M4 moment estimator)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>dB-Hz</string></property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="gui::PlotWidget" name="pliPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Phase lock indicator cos(2 dphi)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>PLI</string></property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="gui::PlotWidget" name="adrPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Accumulated Doppler (carrier phase relative to IF)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>cycles</string></property>
+            </widget>
+           </item>
+           <item row="3" column="2">
+            <widget class="gui::PlotWidget" name="driftPlot" native="true">
+             <property name="minimumSize"><size><width>0</width><height>250</height></size></property>
+             <property name="title" stdset="0"><string>Code epoch drift vs. receiver clock (integrated code Doppler)</string></property>
+             <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+             <property name="yLabel" stdset="0"><string>chips</string></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <!-- ============================================================ All channels -->
+     <widget class="QWidget" name="allTab">
+      <attribute name="title"><string>All channels</string></attribute>
+      <layout class="QGridLayout" name="allGrid">
+       <item row="0" column="0">
+        <widget class="gui::PlotWidget" name="allCn0Plot" native="true">
+         <property name="title" stdset="0"><string>C/N0, all channels</string></property>
+         <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+         <property name="yLabel" stdset="0"><string>dB-Hz</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="gui::PlotWidget" name="allDopplerPlot" native="true">
+         <property name="title" stdset="0"><string>Doppler, all channels</string></property>
+         <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+         <property name="yLabel" stdset="0"><string>Hz</string></property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="gui::PlotWidget" name="allPliPlot" native="true">
+         <property name="title" stdset="0"><string>Phase lock indicator, all channels</string></property>
+         <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+         <property name="yLabel" stdset="0"><string>PLI</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="gui::PlotWidget" name="allDllPlot" native="true">
+         <property name="title" stdset="0"><string>DLL discriminator, all channels (100-ms mean)</string></property>
+         <property name="xLabel" stdset="0"><string>Time since tracking start (s)</string></property>
+         <property name="yLabel" stdset="0"><string>chips</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Correlator shape -->
+     <widget class="QWidget" name="shapeTab">
+      <attribute name="title"><string>Correlator shape</string></attribute>
+      <layout class="QVBoxLayout" name="shapeLayout">
+       <item>
+        <layout class="QHBoxLayout" name="shapeControls">
+         <item><widget class="QLabel" name="shapeChannelLabel"><property name="text"><string>Channel</string></property></widget></item>
+         <item><widget class="QComboBox" name="shapeChannelCombo"><property name="minimumSize"><size><width>160</width><height>0</height></size></property></widget></item>
+         <item><widget class="QLabel" name="shapeMsLabel"><property name="text"><string>Epoch</string></property></widget></item>
+         <item><widget class="QSlider" name="shapeMsSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property></widget></item>
+         <item><widget class="QSpinBox" name="shapeMsSpin"><property name="suffix"><string> ms</string></property></widget></item>
+         <item><widget class="QLabel" name="spanLabel"><property name="text"><string>Span +/-</string></property></widget></item>
+         <item>
+          <widget class="QDoubleSpinBox" name="spanSpin">
+           <property name="suffix"><string> chips</string></property>
+           <property name="minimum"><double>0.250000000000000</double></property>
+           <property name="maximum"><double>5.000000000000000</double></property>
+           <property name="value"><double>1.500000000000000</double></property>
+          </widget>
+         </item>
+         <item><widget class="QLabel" name="tapsLabel"><property name="text"><string>Correlators</string></property></widget></item>
+         <item>
+          <widget class="QSpinBox" name="tapsSpin">
+           <property name="minimum"><number>5</number></property>
+           <property name="maximum"><number>401</number></property>
+           <property name="value"><number>61</number></property>
+          </widget>
+         </item>
+         <item><widget class="QLabel" name="avgLabel"><property name="text"><string>Average</string></property></widget></item>
+         <item>
+          <widget class="QSpinBox" name="avgSpin">
+           <property name="suffix"><string> ms</string></property>
+           <property name="minimum"><number>1</number></property>
+           <property name="maximum"><number>1000</number></property>
+           <property name="value"><number>20</number></property>
+          </widget>
+         </item>
+         <item><widget class="QPushButton" name="computeButton"><property name="text"><string>Compute</string></property></widget></item>
+        </layout>
+       </item>
+       <item><widget class="QLabel" name="shapeInfoLabel"><property name="wordWrap"><bool>true</bool></property></widget></item>
+       <item>
+        <widget class="QSplitter" name="shapeSplitter">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         <widget class="gui::PlotWidget" name="shapePlot" native="true">
+          <property name="title" stdset="0"><string>Correlation function around the prompt (multi-correlator re-computation)</string></property>
+          <property name="xLabel" stdset="0"><string>Replica offset from prompt (chips, + = early)</string></property>
+          <property name="yLabel" stdset="0"><string>Correlation</string></property>
+         </widget>
+         <widget class="gui::DataTable" name="shapeTable"/>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Summary -->
+     <widget class="QWidget" name="summaryTab">
+      <attribute name="title"><string>Summary &amp;&amp; loop design</string></attribute>
+      <layout class="QVBoxLayout" name="summaryLayout">
+       <item>
+        <widget class="QGroupBox" name="summaryGroup">
+         <property name="title"><string>Channel summary (statistics after the pull-in period; double-click to inspect)</string></property>
+         <layout class="QVBoxLayout" name="summaryGroupLayout">
+          <item><widget class="gui::DataTable" name="summaryTable"/></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="loopGroup">
+         <property name="title"><string>Loop filter design</string></property>
+         <layout class="QVBoxLayout" name="loopGroupLayout">
+          <item><widget class="gui::DataTable" name="loopTable"/></item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>shapeMsSlider</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>shapeMsSpin</receiver>
+   <slot>setValue(int)</slot>
+  </connection>
+  <connection>
+   <sender>shapeMsSpin</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>shapeMsSlider</receiver>
+   <slot>setValue(int)</slot>
+  </connection>
+ </connections>
+</ui>

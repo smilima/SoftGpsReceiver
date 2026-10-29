@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CaCodePage</class>
+ <widget class="QWidget" name="CaCodePage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>900</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <layout class="QHBoxLayout" name="controlsLayout">
+     <item><widget class="QLabel" name="prnALabel"><property name="text"><string>PRN</string></property></widget></item>
+     <item>
+      <widget class="QSpinBox" name="prnASpin">
+       <property name="minimum"><number>1</number></property>
+       <property name="maximum"><number>32</number></property>
+       <property name="value"><number>1</number></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="prnBLabel"><property name="text"><string>Cross-correlate with PRN</string></property></widget></item>
+     <item>
+      <widget class="QSpinBox" name="prnBSpin">
+       <property name="minimum"><number>1</number></property>
+       <property name="maximum"><number>32</number></property>
+       <property name="value"><number>2</number></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="chipsLabel"><property name="text"><string>Chips shown</string></property></widget></item>
+     <item>
+      <widget class="QSpinBox" name="chipsSpin">
+       <property name="minimum"><number>10</number></property>
+       <property name="maximum"><number>1023</number></property>
+       <property name="value"><number>40</number></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="infoLabel"><property name="text"><string>   C/A code = G1 XOR G2i;  G1 = 1+x^3+x^10,  G2 = 1+x^2+x^3+x^6+x^8+x^9+x^10 (both initialised to all ones)</string></property></widget></item>
+     <item>
+      <spacer name="controlsSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <widget class="QWidget" name="plotsWidget">
+      <layout class="QGridLayout" name="plotsGrid">
+       <item row="0" column="0">
+        <widget class="gui::PlotWidget" name="sequencePlot" native="true">
+         <property name="xLabel" stdset="0"><string>Chip</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="gui::PlotWidget" name="autoPlot" native="true">
+         <property name="xLabel" stdset="0"><string>Lag (chips)</string></property>
+         <property name="yLabel" stdset="0"><string>Correlation</string></property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="gui::PlotWidget" name="crossPlot" native="true">
+         <property name="xLabel" stdset="0"><string>Lag (chips)</string></property>
+         <property name="yLabel" stdset="0"><string>Correlation</string></property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="gui::PlotWidget" name="trianglePlot" native="true">
+         <property name="xLabel" stdset="0"><string>Offset (chips)</string></property>
+         <property name="yLabel" stdset="0"><string>Normalised correlation</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1" colspan="2">
+        <widget class="gui::PlotWidget" name="spectrumPlot" native="true">
+         <property name="xLabel" stdset="0"><string>Frequency offset (MHz)</string></property>
+         <property name="yLabel" stdset="0"><string>Power (dB)</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QGroupBox" name="tableGroup">
+      <property name="title"><string>Code properties for all PRNs (IS-GPS-200 Table 3-Ia) - click a row to plot that PRN</string></property>
+      <layout class="QVBoxLayout" name="tableLayout">
+       <item><widget class="gui::DataTable" name="codeTable"/></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsDialog</class>
+ <widget class="QDialog" name="SettingsDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>560</width><height>520</height></rect>
+  </property>
+  <property name="windowTitle"><string>Receiver settings</string></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex"><number>0</number></property>
+     <!-- ============================================================ Input -->
+     <widget class="QWidget" name="inputTab">
+      <attribute name="title"><string>Input</string></attribute>
+      <layout class="QFormLayout" name="inputForm">
+       <item row="0" column="0"><widget class="QLabel" name="formatLabel"><property name="text"><string>Sample format</string></property></widget></item>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="formatCombo">
+         <item><property name="text"><string>int8 real</string></property></item>
+         <item><property name="text"><string>uint8 real (offset binary)</string></property></item>
+         <item><property name="text"><string>int16 real (little endian)</string></property></item>
+         <item><property name="text"><string>int8 complex I/Q interleaved</string></property></item>
+         <item><property name="text"><string>int16 complex I/Q interleaved</string></property></item>
+        </widget>
+       </item>
+       <item row="1" column="0"><widget class="QLabel" name="fsLabel"><property name="text"><string>Sampling frequency</string></property></widget></item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="fsSpin">
+         <property name="suffix"><string> MHz</string></property>
+         <property name="decimals"><number>6</number></property>
+         <property name="minimum"><double>0.100000000000000</double></property>
+         <property name="maximum"><double>500.000000000000000</double></property>
+         <property name="singleStep"><double>0.001000000000000</double></property>
+        </widget>
+       </item>
+       <item row="2" column="0"><widget class="QLabel" name="ifLabel"><property name="text"><string>Intermediate frequency</string></property></widget></item>
+       <item row="2" column="1">
+        <widget class="QDoubleSpinBox" name="ifSpin">
+         <property name="suffix"><string> MHz</string></property>
+         <property name="decimals"><number>6</number></property>
+         <property name="minimum"><double>-250.000000000000000</double></property>
+         <property name="maximum"><double>500.000000000000000</double></property>
+         <property name="singleStep"><double>0.001000000000000</double></property>
+        </widget>
+       </item>
+       <item row="3" column="0"><widget class="QLabel" name="skipLabel"><property name="text"><string>Skip at file start</string></property></widget></item>
+       <item row="3" column="1">
+        <widget class="QSpinBox" name="skipSpin">
+         <property name="suffix"><string> bytes</string></property>
+         <property name="maximum"><number>2000000000</number></property>
+        </widget>
+       </item>
+       <item row="4" column="0"><widget class="QLabel" name="msProcessLabel"><property name="text"><string>Data to process</string></property></widget></item>
+       <item row="4" column="1">
+        <widget class="QSpinBox" name="msProcessSpin">
+         <property name="specialValueText"><string>whole file</string></property>
+         <property name="suffix"><string> ms</string></property>
+         <property name="maximum"><number>100000000</number></property>
+        </widget>
+       </item>
+       <item row="5" column="1"><widget class="QPushButton" name="parseButton"><property name="text"><string>Re-read fs / IF / format from file name</string></property></widget></item>
+       <item row="6" column="0"><widget class="QLabel" name="derivedTitle"><property name="text"><string>Derived</string></property></widget></item>
+       <item row="6" column="1"><widget class="QLabel" name="derivedLabel"><property name="wordWrap"><bool>true</bool></property></widget></item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Acquisition -->
+     <widget class="QWidget" name="acqTab">
+      <attribute name="title"><string>Acquisition</string></attribute>
+      <layout class="QFormLayout" name="acqForm">
+       <item row="0" column="0"><widget class="QLabel" name="prnsLabel"><property name="text"><string>PRNs to search</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="prnsEdit"><property name="toolTip"><string>Comma separated list or ranges, e.g. 1-32 or 1,3,5-9</string></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="acqStartLabel"><property name="text"><string>Acquisition data start</string></property></widget></item>
+       <item row="1" column="1"><widget class="QSpinBox" name="acqStartSpin"><property name="suffix"><string> ms</string></property><property name="maximum"><number>1000000</number></property></widget></item>
+       <item row="2" column="0"><widget class="QLabel" name="acqBandLabel"><property name="text"><string>Doppler search band (+/-)</string></property></widget></item>
+       <item row="2" column="1"><widget class="QDoubleSpinBox" name="acqBandSpin"><property name="suffix"><string> Hz</string></property><property name="decimals"><number>0</number></property><property name="minimum"><double>500.000000000000000</double></property><property name="maximum"><double>50000.000000000000000</double></property><property name="singleStep"><double>500.000000000000000</double></property></widget></item>
+       <item row="3" column="0"><widget class="QLabel" name="acqStepLabel"><property name="text"><string>Doppler bin width</string></property></widget></item>
+       <item row="3" column="1"><widget class="QDoubleSpinBox" name="acqStepSpin"><property name="suffix"><string> Hz</string></property><property name="decimals"><number>0</number></property><property name="minimum"><double>50.000000000000000</double></property><property name="maximum"><double>5000.000000000000000</double></property><property name="singleStep"><double>50.000000000000000</double></property></widget></item>
+       <item row="4" column="0"><widget class="QLabel" name="acqNonCohLabel"><property name="text"><string>Non-coherent integration</string></property></widget></item>
+       <item row="4" column="1"><widget class="QSpinBox" name="acqNonCohSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>20</number></property></widget></item>
+       <item row="5" column="0"><widget class="QLabel" name="acqThrLabel"><property name="text"><string>Detection threshold (peak ratio)</string></property></widget></item>
+       <item row="5" column="1"><widget class="QDoubleSpinBox" name="acqThrSpin"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>20.000000000000000</double></property><property name="singleStep"><double>0.100000000000000</double></property></widget></item>
+       <item row="6" column="0"><widget class="QLabel" name="fineMsLabel"><property name="text"><string>Fine frequency data length</string></property></widget></item>
+       <item row="6" column="1"><widget class="QSpinBox" name="fineMsSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>10</number></property><property name="maximum"><number>200</number></property></widget></item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Tracking -->
+     <widget class="QWidget" name="trkTab">
+      <attribute name="title"><string>Tracking</string></attribute>
+      <layout class="QFormLayout" name="trkForm">
+       <item row="0" column="0"><widget class="QLabel" name="channelsLabel"><property name="text"><string>Number of channels</string></property></widget></item>
+       <item row="0" column="1"><widget class="QSpinBox" name="channelsSpin"><property name="minimum"><number>1</number></property><property name="maximum"><number>32</number></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="pllBwLabel"><property name="text"><string>PLL noise bandwidth</string></property></widget></item>
+       <item row="1" column="1"><widget class="QDoubleSpinBox" name="pllBwSpin"><property name="suffix"><string> Hz</string></property><property name="decimals"><number>1</number></property><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>100.000000000000000</double></property></widget></item>
+       <item row="2" column="0"><widget class="QLabel" name="pllZetaLabel"><property name="text"><string>PLL damping ratio</string></property></widget></item>
+       <item row="2" column="1"><widget class="QDoubleSpinBox" name="pllZetaSpin"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.300000000000000</double></property><property name="maximum"><double>2.000000000000000</double></property><property name="singleStep"><double>0.050000000000000</double></property></widget></item>
+       <item row="3" column="0"><widget class="QLabel" name="fllBwLabel"><property name="text"><string>FLL-assist noise bandwidth</string></property></widget></item>
+       <item row="3" column="1"><widget class="QDoubleSpinBox" name="fllBwSpin"><property name="suffix"><string> Hz</string></property><property name="decimals"><number>1</number></property><property name="maximum"><double>50.000000000000000</double></property></widget></item>
+       <item row="4" column="0"><widget class="QLabel" name="fllMsLabel"><property name="text"><string>FLL-assist duration</string></property></widget></item>
+       <item row="4" column="1"><widget class="QSpinBox" name="fllMsSpin"><property name="suffix"><string> ms</string></property><property name="maximum"><number>100000</number></property></widget></item>
+       <item row="5" column="0"><widget class="QLabel" name="dllBwLabel"><property name="text"><string>DLL noise bandwidth</string></property></widget></item>
+       <item row="5" column="1"><widget class="QDoubleSpinBox" name="dllBwSpin"><property name="suffix"><string> Hz</string></property><property name="minimum"><double>0.100000000000000</double></property><property name="maximum"><double>20.000000000000000</double></property><property name="singleStep"><double>0.100000000000000</double></property></widget></item>
+       <item row="6" column="0"><widget class="QLabel" name="dllZetaLabel"><property name="text"><string>DLL damping ratio</string></property></widget></item>
+       <item row="6" column="1"><widget class="QDoubleSpinBox" name="dllZetaSpin"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.300000000000000</double></property><property name="maximum"><double>2.000000000000000</double></property><property name="singleStep"><double>0.050000000000000</double></property></widget></item>
+       <item row="7" column="0"><widget class="QLabel" name="dllSpacingLabel"><property name="text"><string>Early/late offset from prompt</string></property></widget></item>
+       <item row="7" column="1"><widget class="QDoubleSpinBox" name="dllSpacingSpin"><property name="suffix"><string> chips</string></property><property name="decimals"><number>3</number></property><property name="minimum"><double>0.050000000000000</double></property><property name="maximum"><double>1.000000000000000</double></property><property name="singleStep"><double>0.050000000000000</double></property></widget></item>
+       <item row="8" column="1"><widget class="QCheckBox" name="aidingCheck"><property name="text"><string>Carrier-aided DLL</string></property></widget></item>
+       <item row="9" column="0"><widget class="QLabel" name="cn0WinLabel"><property name="text"><string>C/N0 estimator window</string></property></widget></item>
+       <item row="9" column="1"><widget class="QSpinBox" name="cn0WinSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>20</number></property><property name="maximum"><number>2000</number></property></widget></item>
+      </layout>
+     </widget>
+     <!-- ============================================================ Navigation -->
+     <widget class="QWidget" name="navTab">
+      <attribute name="title"><string>Navigation</string></attribute>
+      <layout class="QFormLayout" name="navForm">
+       <item row="0" column="0"><widget class="QLabel" name="bitStartLabel"><property name="text"><string>Ignore pull-in before</string></property></widget></item>
+       <item row="0" column="1"><widget class="QSpinBox" name="bitStartSpin"><property name="suffix"><string> ms</string></property><property name="maximum"><number>100000</number></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="navPeriodLabel"><property name="text"><string>Navigation solution period</string></property></widget></item>
+       <item row="1" column="1"><widget class="QSpinBox" name="navPeriodSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>60000</number></property></widget></item>
+       <item row="2" column="0"><widget class="QLabel" name="elMaskLabel"><property name="text"><string>Elevation mask</string></property></widget></item>
+       <item row="2" column="1"><widget class="QDoubleSpinBox" name="elMaskSpin"><property name="suffix"><string> deg</string></property><property name="decimals"><number>1</number></property><property name="minimum"><double>-10.000000000000000</double></property><property name="maximum"><double>60.000000000000000</double></property></widget></item>
+       <item row="3" column="0"><widget class="QLabel" name="minCn0Label"><property name="text"><string>Minimum C/N0 for use</string></property></widget></item>
+       <item row="3" column="1"><widget class="QDoubleSpinBox" name="minCn0Spin"><property name="suffix"><string> dB-Hz</string></property><property name="decimals"><number>1</number></property><property name="maximum"><double>60.000000000000000</double></property></widget></item>
+       <item row="4" column="1"><widget class="QCheckBox" name="ionoCheck"><property name="text"><string>Klobuchar ionosphere (if subframe 4 page 18 decoded)</string></property></widget></item>
+       <item row="5" column="1"><widget class="QCheckBox" name="tropoCheck"><property name="text"><string>Saastamoinen troposphere</string></property></widget></item>
+       <item row="6" column="1"><widget class="QCheckBox" name="earthRotCheck"><property name="text"><string>Earth rotation (Sagnac) correction</string></property></widget></item>
+       <item row="7" column="1"><widget class="QCheckBox" name="elWeightCheck"><property name="text"><string>Elevation-dependent weighting (sin^2 el)</string></property></widget></item>
+       <item row="8" column="0"><widget class="QLabel" name="dopSignLabel"><property name="text"><string>IF Doppler sign</string></property></widget></item>
+       <item row="8" column="1">
+        <widget class="QComboBox" name="dopSignCombo">
+         <item><property name="text"><string>Auto-detect</string></property></item>
+         <item><property name="text"><string>Normal (low-side LO)</string></property></item>
+         <item><property name="text"><string>Inverted spectrum (high-side LO)</string></property></item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok|QDialogButtonBox::RestoreDefaults</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>SettingsDialog</receiver>
+   <slot>accept()</slot>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>SettingsDialog</receiver>
+   <slot>reject()</slot>
+  </connection>
+ </connections>
+</ui>

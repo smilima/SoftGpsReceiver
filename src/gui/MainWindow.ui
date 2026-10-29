@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1600</width><height>1000</height></rect>
+  </property>
+  <property name="windowTitle"><string>Software GPS Receiver</string></property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="centralLayout">
+    <property name="leftMargin"><number>2</number></property>
+    <property name="topMargin"><number>2</number></property>
+    <property name="rightMargin"><number>2</number></property>
+    <property name="bottomMargin"><number>2</number></property>
+    <item>
+     <widget class="QTabWidget" name="pages">
+      <property name="currentIndex"><number>0</number></property>
+      <property name="documentMode"><bool>true</bool></property>
+      <widget class="gui::OverviewPage" name="overviewPage">
+       <attribute name="title"><string>Overview</string></attribute>
+      </widget>
+      <widget class="gui::RawSignalPage" name="rawSignalPage">
+       <attribute name="title"><string>Raw signal</string></attribute>
+      </widget>
+      <widget class="gui::CaCodePage" name="caCodePage">
+       <attribute name="title"><string>C/A codes</string></attribute>
+      </widget>
+      <widget class="gui::AcquisitionPage" name="acquisitionPage">
+       <attribute name="title"><string>Acquisition</string></attribute>
+      </widget>
+      <widget class="gui::TrackingPage" name="trackingPage">
+       <attribute name="title"><string>Tracking</string></attribute>
+      </widget>
+      <widget class="gui::BitSyncPage" name="bitSyncPage">
+       <attribute name="title"><string>Bit sync &amp;&amp; data bits</string></attribute>
+      </widget>
+      <widget class="gui::NavMessagePage" name="navMessagePage">
+       <attribute name="title"><string>Navigation message</string></attribute>
+      </widget>
+      <widget class="gui::EphemerisPage" name="ephemerisPage">
+       <attribute name="title"><string>Ephemeris, almanac &amp;&amp; health</string></attribute>
+      </widget>
+      <widget class="gui::SatellitesPage" name="satellitesPage">
+       <attribute name="title"><string>Satellites &amp;&amp; orbits</string></attribute>
+      </widget>
+      <widget class="gui::MeasurementsPage" name="measurementsPage">
+       <attribute name="title"><string>Pseudoranges</string></attribute>
+      </widget>
+      <widget class="gui::PositionPage" name="positionPage">
+       <attribute name="title"><string>Position</string></attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1600</width><height>22</height></rect></property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title"><string>&amp;File</string></property>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSettings"/>
+    <addaction name="separator"/>
+    <addaction name="actionExportCsv"/>
+    <addaction name="actionExportKml"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuRun">
+    <property name="title"><string>&amp;Run</string></property>
+    <addaction name="actionRunAll"/>
+    <addaction name="separator"/>
+    <addaction name="actionAcquire"/>
+    <addaction name="actionTrack"/>
+    <addaction name="actionDecode"/>
+    <addaction name="actionSolve"/>
+    <addaction name="separator"/>
+    <addaction name="actionStop"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title"><string>&amp;View</string></property>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title"><string>&amp;Help</string></property>
+    <addaction name="actionAlgorithms"/>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuRun"/>
+   <addaction name="menuView"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle"><string>Pipeline</string></property>
+   <property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property>
+   <attribute name="toolBarArea"><enum>TopToolBarArea</enum></attribute>
+   <attribute name="toolBarBreak"><bool>false</bool></attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionSettings"/>
+   <addaction name="separator"/>
+   <addaction name="actionRunAll"/>
+   <addaction name="actionAcquire"/>
+   <addaction name="actionTrack"/>
+   <addaction name="actionDecode"/>
+   <addaction name="actionSolve"/>
+   <addaction name="actionStop"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QDockWidget" name="logDock">
+   <property name="windowTitle"><string>Processing log</string></property>
+   <attribute name="dockWidgetArea"><number>8</number></attribute>
+   <widget class="QWidget" name="logDockContents">
+    <layout class="QVBoxLayout" name="logLayout">
+     <property name="leftMargin"><number>2</number></property>
+     <property name="topMargin"><number>2</number></property>
+     <property name="rightMargin"><number>2</number></property>
+     <property name="bottomMargin"><number>2</number></property>
+     <item>
+      <widget class="QPlainTextEdit" name="logView">
+       <property name="readOnly"><bool>true</bool></property>
+       <property name="maximumBlockCount"><number>20000</number></property>
+       <property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <action name="actionOpen">
+   <property name="text"><string>&amp;Open recording...</string></property>
+   <property name="toolTip"><string>Open a recorded IF sample file (.bin)</string></property>
+   <property name="shortcut"><string>Ctrl+O</string></property>
+  </action>
+  <action name="actionSettings">
+   <property name="text"><string>&amp;Settings...</string></property>
+   <property name="toolTip"><string>Sampling/IF frequency, acquisition, tracking loop and navigation parameters</string></property>
+   <property name="shortcut"><string>Ctrl+,</string></property>
+  </action>
+  <action name="actionExportCsv">
+   <property name="text"><string>Export solutions to &amp;CSV...</string></property>
+  </action>
+  <action name="actionExportKml">
+   <property name="text"><string>Export track to &amp;KML...</string></property>
+  </action>
+  <action name="actionExit">
+   <property name="text"><string>E&amp;xit</string></property>
+   <property name="shortcut"><string>Ctrl+Q</string></property>
+  </action>
+  <action name="actionRunAll">
+   <property name="text"><string>Run &amp;all</string></property>
+   <property name="toolTip"><string>Acquisition, tracking, navigation message decoding and position solution</string></property>
+   <property name="shortcut"><string>F5</string></property>
+  </action>
+  <action name="actionAcquire">
+   <property name="text"><string>1 Acquire</string></property>
+   <property name="toolTip"><string>Search all PRNs over code phase and Doppler</string></property>
+   <property name="shortcut"><string>F6</string></property>
+  </action>
+  <action name="actionTrack">
+   <property name="text"><string>2 Track</string></property>
+   <property name="toolTip"><string>Run the code and carrier tracking loops for the acquired satellites</string></property>
+   <property name="shortcut"><string>F7</string></property>
+  </action>
+  <action name="actionDecode">
+   <property name="text"><string>3 Decode</string></property>
+   <property name="toolTip"><string>Bit synchronisation, subframe decoding, parity, ephemeris and almanac</string></property>
+   <property name="shortcut"><string>F8</string></property>
+  </action>
+  <action name="actionSolve">
+   <property name="text"><string>4 Solve</string></property>
+   <property name="toolTip"><string>Pseudoranges and least-squares position/velocity/time</string></property>
+   <property name="shortcut"><string>F9</string></property>
+  </action>
+  <action name="actionStop">
+   <property name="enabled"><bool>false</bool></property>
+   <property name="text"><string>Stop</string></property>
+   <property name="shortcut"><string>Ctrl+.</string></property>
+  </action>
+  <action name="actionAlgorithms">
+   <property name="text"><string>How it works (algorithms)</string></property>
+   <property name="shortcut"><string>F1</string></property>
+  </action>
+  <action name="actionAbout">
+   <property name="text"><string>&amp;About</string></property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::OverviewPage</class>
+   <extends>QWidget</extends>
+   <header>gui/OverviewPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::RawSignalPage</class>
+   <extends>QWidget</extends>
+   <header>gui/RawSignalPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::CaCodePage</class>
+   <extends>QWidget</extends>
+   <header>gui/CaCodePage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::AcquisitionPage</class>
+   <extends>QWidget</extends>
+   <header>gui/AcquisitionPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::TrackingPage</class>
+   <extends>QWidget</extends>
+   <header>gui/TrackingPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::BitSyncPage</class>
+   <extends>QWidget</extends>
+   <header>gui/BitSyncPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::NavMessagePage</class>
+   <extends>QWidget</extends>
+   <header>gui/NavMessagePage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::EphemerisPage</class>
+   <extends>QWidget</extends>
+   <header>gui/EphemerisPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::SatellitesPage</class>
+   <extends>QWidget</extends>
+   <header>gui/SatellitesPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::MeasurementsPage</class>
+   <extends>QWidget</extends>
+   <header>gui/MeasurementsPage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::PositionPage</class>
+   <extends>QWidget</extends>
+   <header>gui/PositionPage.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>actionExit</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+  </connection>
+ </connections>
+</ui>

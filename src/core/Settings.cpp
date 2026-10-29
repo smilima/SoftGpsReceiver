@@ -1,0 +1,169 @@
+#include "Settings.h"
+
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <QSettings>
+#include <cmath>
+
+namespace gnss {
+
+QString sampleFormatName(SampleFormat f)
+{
+    switch (f) {
+    case SampleFormat::Int8Real:  return QStringLiteral("int8 real");
+    case SampleFormat::UInt8Real: return QStringLiteral("uint8 real (offset binary)");
+    case SampleFormat::Int16Real: return QStringLiteral("int16 real (little endian)");
+    case SampleFormat::Int8IQ:    return QStringLiteral("int8 complex I/Q interleaved");
+    case SampleFormat::Int16IQ:   return QStringLiteral("int16 complex I/Q interleaved");
+    }
+    return QStringLiteral("?");
+}
+
+ReceiverSettings::ReceiverSettings()
+{
+    for (int p = 1; p <= 32; ++p) acqPrns.append(p);
+}
+
+int ReceiverSettings::samplesPerCode() const
+{
+    return int(std::lround(samplingFreq / 1000.0));
+}
+
+bool ReceiverSettings::isComplex() const
+{
+    return format == SampleFormat::Int8IQ || format == SampleFormat::Int16IQ;
+}
+
+int ReceiverSettings::bytesPerSample() const
+{
+    switch (format) {
+    case SampleFormat::Int8Real:
+    case SampleFormat::UInt8Real: return 1;
+    case SampleFormat::Int16Real: return 2;
+    case SampleFormat::Int8IQ:    return 2;
+    case SampleFormat::Int16IQ:   return 4;
+    }
+    return 1;
+}
+
+QVector<int> ReceiverSettings::prnList() const
+{
+    if (!acqPrns.isEmpty()) return acqPrns;
+    QVector<int> v;
+    for (int p = 1; p <= 32; ++p) v.append(p);
+    return v;
+}
+
+double ReceiverSettings::dopplerSignValue() const
+{
+    return dopplerSign == DopplerSign::Inverted ? -1.0 : 1.0;
+}
+
+static double numberFromCaptures(const QString& a, const QString& b)
+{
+    QString s = a;
+    if (!b.isEmpty()) s += QLatin1Char('.') + b;
+    double v = s.toDouble();
+    if (v < 1.0e4) v *= 1.0e6;   // values without units are in MHz
+    return v;
+}
+
+bool ReceiverSettings::parseFileName(const QString& path, double* fs, double* fif, SampleFormat* fmt)
+{
+    const QString base = QFileInfo(path).fileName();
+    static const QRegularExpression reFs(QStringLiteral("(?:^|[^A-Za-z])fs[_\\-=]?(\\d+)(?:[_.p](\\d+))?"),
+                                         QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression reIf(QStringLiteral("(?:^|[^A-Za-z])if[_\\-=]?(\\d+)(?:[_.p](\\d+))?"),
+                                         QRegularExpression::CaseInsensitiveOption);
+    const auto mFs = reFs.match(base);
+    const auto mIf = reIf.match(base);
+    if (mFs.hasMatch() && fs) *fs = numberFromCaptures(mFs.captured(1), mFs.captured(2));
+    if (mIf.hasMatch() && fif) *fif = numberFromCaptures(mIf.captured(1), mIf.captured(2));
+
+    if (fmt) {
+        const QString lower = base.toLower();
+        const bool iq = lower.contains(QLatin1String("iq")) || lower.contains(QLatin1String("complex"));
+        if (lower.contains(QLatin1String("int16")) || lower.contains(QLatin1String("i16")))
+            *fmt = iq ? SampleFormat::Int16IQ : SampleFormat::Int16Real;
+        else if (lower.contains(QLatin1String("uint8")) || lower.contains(QLatin1String("u8")))
+            *fmt = SampleFormat::UInt8Real;
+        else
+            *fmt = iq ? SampleFormat::Int8IQ : SampleFormat::Int8Real;
+    }
+    return mFs.hasMatch() && mIf.hasMatch();
+}
+
+QString ReceiverSettings::summary() const
+{
+    return QStringLiteral("fs = %1 MHz, IF = %2 MHz, format = %3, channels = %4, PLL %5 Hz, DLL %6 Hz, FLL %7 Hz")
+        .arg(samplingFreq / 1e6, 0, 'f', 4)
+        .arg(ifFreq / 1e6, 0, 'f', 4)
+        .arg(sampleFormatName(format))
+        .arg(numChannels)
+        .arg(pllBandwidth).arg(dllBandwidth).arg(fllBandwidth);
+}
+
+void ReceiverSettings::save(QSettings& s) const
+{
+    s.beginGroup(QStringLiteral("receiver"));
+    s.setValue("acqStartMs", acqStartMs);
+    s.setValue("acqSearchBand", acqSearchBand);
+    s.setValue("acqStep", acqStep);
+    s.setValue("acqNonCoherent", acqNonCoherent);
+    s.setValue("acqThreshold", acqThreshold);
+    s.setValue("fineFreqMs", fineFreqMs);
+    s.setValue("numChannels", numChannels);
+    s.setValue("dllBandwidth", dllBandwidth);
+    s.setValue("dllDamping", dllDamping);
+    s.setValue("dllSpacing", dllSpacing);
+    s.setValue("pllBandwidth", pllBandwidth);
+    s.setValue("pllDamping", pllDamping);
+    s.setValue("fllBandwidth", fllBandwidth);
+    s.setValue("fllAssistMs", fllAssistMs);
+    s.setValue("carrierAiding", carrierAiding);
+    s.setValue("cn0WindowMs", cn0WindowMs);
+    s.setValue("bitSyncStartMs", bitSyncStartMs);
+    s.setValue("navSolPeriodMs", navSolPeriodMs);
+    s.setValue("elevationMask", elevationMask);
+    s.setValue("minCn0", minCn0);
+    s.setValue("useIono", useIono);
+    s.setValue("useTropo", useTropo);
+    s.setValue("useEarthRotation", useEarthRotation);
+    s.setValue("elevationWeighting", elevationWeighting);
+    s.setValue("dopplerSign", int(dopplerSign));
+    s.endGroup();
+}
+
+void ReceiverSettings::load(QSettings& s)
+{
+    ReceiverSettings d;
+    s.beginGroup(QStringLiteral("receiver"));
+    acqStartMs = s.value("acqStartMs", d.acqStartMs).toInt();
+    acqSearchBand = s.value("acqSearchBand", d.acqSearchBand).toDouble();
+    acqStep = s.value("acqStep", d.acqStep).toDouble();
+    acqNonCoherent = s.value("acqNonCoherent", d.acqNonCoherent).toInt();
+    acqThreshold = s.value("acqThreshold", d.acqThreshold).toDouble();
+    fineFreqMs = s.value("fineFreqMs", d.fineFreqMs).toInt();
+    numChannels = s.value("numChannels", d.numChannels).toInt();
+    dllBandwidth = s.value("dllBandwidth", d.dllBandwidth).toDouble();
+    dllDamping = s.value("dllDamping", d.dllDamping).toDouble();
+    dllSpacing = s.value("dllSpacing", d.dllSpacing).toDouble();
+    pllBandwidth = s.value("pllBandwidth", d.pllBandwidth).toDouble();
+    pllDamping = s.value("pllDamping", d.pllDamping).toDouble();
+    fllBandwidth = s.value("fllBandwidth", d.fllBandwidth).toDouble();
+    fllAssistMs = s.value("fllAssistMs", d.fllAssistMs).toInt();
+    carrierAiding = s.value("carrierAiding", d.carrierAiding).toBool();
+    cn0WindowMs = s.value("cn0WindowMs", d.cn0WindowMs).toInt();
+    bitSyncStartMs = s.value("bitSyncStartMs", d.bitSyncStartMs).toInt();
+    navSolPeriodMs = s.value("navSolPeriodMs", d.navSolPeriodMs).toInt();
+    elevationMask = s.value("elevationMask", d.elevationMask).toDouble();
+    minCn0 = s.value("minCn0", d.minCn0).toDouble();
+    useIono = s.value("useIono", d.useIono).toBool();
+    useTropo = s.value("useTropo", d.useTropo).toBool();
+    useEarthRotation = s.value("useEarthRotation", d.useEarthRotation).toBool();
+    elevationWeighting = s.value("elevationWeighting", d.elevationWeighting).toBool();
+    dopplerSign = DopplerSign(s.value("dopplerSign", int(d.dopplerSign)).toInt());
+    s.endGroup();
+}
+
+} // namespace gnss

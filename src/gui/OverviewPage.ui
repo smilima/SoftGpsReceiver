@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OverviewPage</class>
+ <widget class="QWidget" name="OverviewPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>900</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <widget class="QScrollArea" name="scrollArea">
+      <property name="widgetResizable"><bool>true</bool></property>
+      <widget class="QWidget" name="scrollContents">
+       <layout class="QVBoxLayout" name="leftLayout">
+        <item>
+         <widget class="QGroupBox" name="recordingGroup">
+          <property name="title"><string>Recording</string></property>
+          <layout class="QFormLayout" name="recordingForm">
+           <item row="0" column="0"><widget class="QLabel" name="fileLabel"><property name="text"><string>File:</string></property></widget></item>
+           <item row="0" column="1"><widget class="QLabel" name="fileValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="sizeLabel"><property name="text"><string>Size:</string></property></widget></item>
+           <item row="1" column="1"><widget class="QLabel" name="sizeValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="formatLabel"><property name="text"><string>Sample format:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QLabel" name="formatValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="fsLabel"><property name="text"><string>Sampling frequency:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QLabel" name="fsValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="4" column="0"><widget class="QLabel" name="ifLabel"><property name="text"><string>Intermediate frequency:</string></property></widget></item>
+           <item row="4" column="1"><widget class="QLabel" name="ifValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="5" column="0"><widget class="QLabel" name="durationLabel"><property name="text"><string>Duration:</string></property></widget></item>
+           <item row="5" column="1"><widget class="QLabel" name="durationValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="6" column="0"><widget class="QLabel" name="spmsLabel"><property name="text"><string>Samples per C/A code period:</string></property></widget></item>
+           <item row="6" column="1"><widget class="QLabel" name="spmsValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="7" column="0"><widget class="QLabel" name="spcLabel"><property name="text"><string>Samples per chip:</string></property></widget></item>
+           <item row="7" column="1"><widget class="QLabel" name="spcValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="8" column="0"><widget class="QLabel" name="ifPlacementLabel"><property name="text"><string>IF placement:</string></property></widget></item>
+           <item row="8" column="1"><widget class="QLabel" name="ifPlacementValue"><property name="text"><string>-</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="pipelineGroup">
+          <property name="title"><string>Processing pipeline</string></property>
+          <layout class="QVBoxLayout" name="pipelineLayout">
+           <item><widget class="gui::DataTable" name="pipelineTable"><property name="minimumSize"><size><width>0</width><height>150</height></size></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="satellitesGroup">
+          <property name="title"><string>Satellites (double-click a row to inspect that PRN on every page)</string></property>
+          <layout class="QVBoxLayout" name="satellitesLayout">
+           <item><widget class="gui::DataTable" name="satellitesTable"><property name="minimumSize"><size><width>0</width><height>260</height></size></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="positionGroup">
+          <property name="title"><string>Position solution</string></property>
+          <layout class="QFormLayout" name="positionForm">
+           <item row="0" column="0"><widget class="QLabel" name="latLabel"><property name="text"><string>Latitude:</string></property></widget></item>
+           <item row="0" column="1"><widget class="QLabel" name="latValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="lonLabel"><property name="text"><string>Longitude:</string></property></widget></item>
+           <item row="1" column="1"><widget class="QLabel" name="lonValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="heightLabel"><property name="text"><string>Ellipsoidal height:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QLabel" name="heightValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="ecefLabel"><property name="text"><string>ECEF X, Y, Z:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QLabel" name="ecefValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="4" column="0"><widget class="QLabel" name="utmLabel"><property name="text"><string>UTM:</string></property></widget></item>
+           <item row="4" column="1"><widget class="QLabel" name="utmValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="5" column="0"><widget class="QLabel" name="fixesLabel"><property name="text"><string>Fixes:</string></property></widget></item>
+           <item row="5" column="1"><widget class="QLabel" name="fixesValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="6" column="0"><widget class="QLabel" name="stdLabel"><property name="text"><string>Std. dev. E / N / U:</string></property></widget></item>
+           <item row="6" column="1"><widget class="QLabel" name="stdValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="7" column="0"><widget class="QLabel" name="cepLabel"><property name="text"><string>CEP50 / 2DRMS / SEP50:</string></property></widget></item>
+           <item row="7" column="1"><widget class="QLabel" name="cepValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="8" column="0"><widget class="QLabel" name="dopLabel"><property name="text"><string>Mean satellites / PDOP / HDOP:</string></property></widget></item>
+           <item row="8" column="1"><widget class="QLabel" name="dopValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="9" column="0"><widget class="QLabel" name="timeLabel"><property name="text"><string>GPS week (mod 1024) / TOW:</string></property></widget></item>
+           <item row="9" column="1"><widget class="QLabel" name="timeValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="10" column="0"><widget class="QLabel" name="dateLabel"><property name="text"><string>Date candidates:</string></property></widget></item>
+           <item row="10" column="1"><widget class="QLabel" name="dateValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="11" column="0"><widget class="QLabel" name="clockLabel"><property name="text"><string>Receiver clock:</string></property></widget></item>
+           <item row="11" column="1"><widget class="QLabel" name="clockValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="12" column="0"><widget class="QLabel" name="ifCheckLabel"><property name="text"><string>Front-end frequency check:</string></property></widget></item>
+           <item row="12" column="1"><widget class="QLabel" name="ifCheckValue"><property name="text"><string>-</string></property></widget></item>
+           <item row="13" column="1"><widget class="QPushButton" name="mapButton"><property name="enabled"><bool>false</bool></property><property name="text"><string>Show position on OpenStreetMap</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="leftSpacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+     <widget class="QTextBrowser" name="docBrowser">
+      <property name="openExternalLinks"><bool>true</bool></property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

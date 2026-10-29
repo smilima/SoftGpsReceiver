@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NavMessagePage</class>
+ <widget class="QWidget" name="NavMessagePage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>1000</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <layout class="QHBoxLayout" name="controlsLayout">
+     <item><widget class="QLabel" name="channelLabel"><property name="text"><string>Channel</string></property></widget></item>
+     <item><widget class="QComboBox" name="channelCombo"><property name="minimumSize"><size><width>160</width><height>0</height></size></property></widget></item>
+     <item>
+      <widget class="QLabel" name="headerLabel">
+       <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <widget class="QGroupBox" name="subframesGroup">
+      <property name="title"><string>Subframes (select one)</string></property>
+      <layout class="QVBoxLayout" name="subframesLayout">
+       <item><widget class="gui::DataTable" name="subframesTable"/></item>
+      </layout>
+     </widget>
+     <widget class="QSplitter" name="rightSplitter">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+      <widget class="QGroupBox" name="wordsGroup">
+       <property name="title"><string>Words: parity check per IS-GPS-200 Table 20-XIV (d = D xor D30*)</string></property>
+       <layout class="QVBoxLayout" name="wordsLayout">
+        <item><widget class="gui::DataTable" name="wordsTable"/></item>
+       </layout>
+      </widget>
+      <widget class="QGroupBox" name="bitmapGroup">
+       <property name="title"><string>Bit map of source data bits (colour = field, hover for its name, grey = parity, dark = word failed parity)</string></property>
+       <layout class="QVBoxLayout" name="bitmapLayout">
+        <item><widget class="gui::DataTable" name="bitmapTable"/></item>
+       </layout>
+      </widget>
+      <widget class="QGroupBox" name="fieldsGroup">
+       <property name="title"><string>Decoded fields</string></property>
+       <layout class="QVBoxLayout" name="fieldsLayout">
+        <item><widget class="gui::DataTable" name="fieldsTable"/></item>
+       </layout>
+      </widget>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

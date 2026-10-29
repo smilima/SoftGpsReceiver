@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AcquisitionPage</class>
+ <widget class="QWidget" name="AcquisitionPage">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1400</width><height>1000</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QSplitter" name="mainSplitter">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <widget class="QSplitter" name="topSplitter">
+      <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      <widget class="QWidget" name="barsWidget">
+       <layout class="QVBoxLayout" name="barsLayout">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <widget class="gui::PlotWidget" name="metricPlot" native="true">
+          <property name="title" stdset="0"><string>Acquisition metric (peak / second peak) - click a bar</string></property>
+          <property name="xLabel" stdset="0"><string>PRN</string></property>
+          <property name="yLabel" stdset="0"><string>Metric</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="gui::PlotWidget" name="cn0Plot" native="true">
+          <property name="title" stdset="0"><string>C/N0 estimated from the correlation peak</string></property>
+          <property name="xLabel" stdset="0"><string>PRN</string></property>
+          <property name="yLabel" stdset="0"><string>C/N0 (dB-Hz)</string></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QGroupBox" name="resultsGroup">
+       <property name="title"><string>Acquisition results (all searched PRNs) - click a row</string></property>
+       <layout class="QVBoxLayout" name="resultsLayout">
+        <item><widget class="gui::DataTable" name="resultsTable"/></item>
+       </layout>
+      </widget>
+     </widget>
+     <widget class="QWidget" name="detailWidget">
+      <layout class="QVBoxLayout" name="detailLayout">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QCheckBox" name="chipsAxisCheck">
+         <property name="text"><string>Code phase axis in chips</string></property>
+         <property name="checked"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="detailGrid" rowstretch="3,2,2" columnstretch="1,1">
+         <item row="0" column="0" colspan="2">
+          <widget class="gui::PlotWidget" name="surfacePlot" native="true">
+           <property name="yLabel" stdset="0"><string>Doppler (Hz)</string></property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="gui::PlotWidget" name="codeSlicePlot" native="true">
+           <property name="yLabel" stdset="0"><string>Correlation power</string></property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="gui::PlotWidget" name="dopplerSlicePlot" native="true">
+           <property name="xLabel" stdset="0"><string>Doppler (Hz, relative to nominal IF)</string></property>
+           <property name="yLabel" stdset="0"><string>Correlation power</string></property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="gui::PlotWidget" name="finePlot" native="true">
+           <property name="title" stdset="0"><string>Fine frequency search: spectrum of squared 0.5-ms correlations</string></property>
+           <property name="xLabel" stdset="0"><string>Frequency offset from coarse bin (Hz)</string></property>
+           <property name="yLabel" stdset="0"><string>Magnitude</string></property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QGroupBox" name="paramsGroup">
+           <property name="title"><string>Search parameters</string></property>
+           <layout class="QVBoxLayout" name="paramsLayout">
+            <item><widget class="gui::DataTable" name="paramsTable"/></item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>gui::PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>gui/PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>gui::DataTable</class>
+   <extends>QTableWidget</extends>
+   <header>gui/DataTable.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

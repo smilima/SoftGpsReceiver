@@ -1,0 +1,231 @@
+#include "Acquisition.h"
+#include "CaCode.h"
+#include "Constants.h"
+#include "Fft.h"
+
+#include <QElapsedTimer>
+#include <QtConcurrent/QtConcurrentMap>
+
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+
+namespace gnss {
+
+namespace {
+
+// Fine frequency estimation robust to navigation-bit transitions:
+// the code is wiped off with the acquired code phase, the residual carrier is
+// integrated coherently over 0.5 ms blocks P_k, and the spectrum of P_k^2
+// (which removes the +/-1 data modulation and doubles the frequency) is
+// evaluated on a 1 Hz grid. The frequency offset is half of the peak location.
+void fineFrequency(const std::vector<float>& sI, const std::vector<float>& sQ, int available,
+                   double fs, int fineMs, AcqResult& r)
+{
+    const int N = int(std::lround(fs / 1000.0));
+    const int half = N / 2;
+    int nBlk = 2 * fineMs;
+    while (nBlk > 0 && r.codePhase + nBlk * half > available) --nBlk;
+    r.fineFreq = r.coarseFreq;
+    if (nBlk < 8) return;
+
+    const auto chips = CaCode::chips(r.prn);
+    const double w = -kTwoPi * r.coarseFreq / fs;
+    std::vector<cplx> z(nBlk);
+    for (int k = 0; k < nBlk; ++k) {
+        double ai = 0, aq = 0;
+        for (int n = k * half; n < (k + 1) * half; ++n) {
+            const int si = r.codePhase + n;
+            const int ci = int(std::floor(n * kCaChipRate / fs)) % kCaCodeLength;
+            const double a = w * double(si);
+            const double c = std::cos(a), s = std::sin(a);
+            const double x = sI[si], y = sQ[si];
+            ai += chips[ci] * (x * c - y * s);
+            aq += chips[ci] * (x * s + y * c);
+        }
+        const cplx p(ai, aq);
+        z[k] = cmul(p, p);
+    }
+    const double tBlk = double(half) / fs;
+    const int nF = 2001;      // 2*df from -1000..+1000 Hz in 1 Hz steps
+    r.fineAxis.resize(nF);
+    r.fineSpectrum.resize(nF);
+    int best = 0;
+    for (int i = 0; i < nF; ++i) {
+        const double f2 = -1000.0 + i;
+        const cplx rot(std::cos(-kTwoPi * f2 * tBlk), std::sin(-kTwoPi * f2 * tBlk));
+        cplx ph(1, 0), acc(0, 0);
+        for (int k = 0; k < nBlk; ++k) { acc += cmul(z[k], ph); ph = cmul(ph, rot); }
+        r.fineAxis[i] = f2 / 2.0;
+        r.fineSpectrum[i] = float(std::abs(acc));
+        if (r.fineSpectrum[i] > r.fineSpectrum[best]) best = i;
+    }
+    double f2 = -1000.0 + best;
+    if (best > 0 && best < nF - 1) {
+        const double y0 = r.fineSpectrum[best - 1], y1 = r.fineSpectrum[best], y2 = r.fineSpectrum[best + 1];
+        const double den = y0 - 2 * y1 + y2;
+        if (den != 0) f2 += 0.5 * (y0 - y2) / den;
+    }
+    r.fineDelta = f2 / 2.0;
+    r.fineFreq = r.coarseFreq + r.fineDelta;
+}
+
+} // namespace
+
+AcquisitionOutput Acquisition::run(const SignalSource& src, const ReceiverSettings& s,
+                                   const std::atomic<bool>* cancel,
+                                   const std::function<void(int)>& progress)
+{
+    AcquisitionOutput out;
+    QElapsedTimer timer;
+    timer.start();
+
+    const double fs = s.samplingFreq;
+    const int N = s.samplesPerCode();
+    const int K = std::max(1, s.acqNonCoherent);
+    const int fineMs = std::max(10, s.fineFreqMs);
+    const qint64 start = qint64(std::llround(s.acqStartMs * fs / 1000.0));
+    const int total = N * (K + fineMs + 2);
+
+    out.samplesPerCode = N;
+    out.startSample = start;
+    out.nonCoherent = K;
+    out.fftSize = N;
+
+    std::vector<float> sI(total), sQ(total);
+    const int got = src.read(start, total, sI.data(), sQ.data());
+    if (got < N * K) {
+        out.error = QStringLiteral("Not enough data for acquisition");
+        return out;
+    }
+    // Remove any DC offset (matters for zero-IF complex recordings)
+    double mi = 0, mq = 0;
+    for (int i = 0; i < got; ++i) { mi += sI[i]; mq += sQ[i]; }
+    mi /= got; mq /= got;
+    for (int i = 0; i < got; ++i) { sI[i] -= float(mi); sQ[i] -= float(mq); }
+
+    const int nBins = int(std::floor(2.0 * s.acqSearchBand / s.acqStep + 1e-6)) + 1;
+    out.binFreqs.resize(nBins);
+    for (int b = 0; b < nBins; ++b) out.binFreqs[b] = s.ifFreq - s.acqSearchBand + b * s.acqStep;
+
+    const QVector<int> prnList = s.prnList();
+    std::vector<int> prns(prnList.begin(), prnList.end());
+    const int P = int(prns.size());
+    out.results.resize(P);
+    for (int p = 0; p < P; ++p) out.results[p].prn = prns[p];
+
+    // ---- FFT of each sampled C/A code replica (conjugated)
+    std::vector<std::vector<cplx>> codeSpec(P);
+    std::vector<int> pIdx(P);
+    std::iota(pIdx.begin(), pIdx.end(), 0);
+    QtConcurrent::blockingMap(pIdx, [&](const int& p) {
+        Fft fft(N);
+        const auto chips = CaCode::chips(prns[p]);
+        std::vector<cplx> c(N);
+        for (int n = 0; n < N; ++n) {
+            const int ci = int(std::floor(n * kCaChipRate / fs)) % kCaCodeLength;
+            c[n] = cplx(chips[ci], 0);
+        }
+        fft.forward(c);
+        for (auto& v : c) v = std::conj(v);
+        codeSpec[p] = std::move(c);
+    });
+    {
+        Fft probe(N);
+        out.fftInternalSize = probe.internalSize();
+    }
+
+    // ---- correlation surfaces: corr[p][bin * N + tau]
+    std::vector<std::vector<float>> corr(P, std::vector<float>(size_t(nBins) * N, 0.0f));
+    std::atomic<int> done{0};
+    std::vector<int> bins(nBins);
+    std::iota(bins.begin(), bins.end(), 0);
+    QtConcurrent::blockingMap(bins, [&](const int& b) {
+        if (cancel && cancel->load()) return;
+        Fft fft(N);
+        std::vector<cplx> X(N), Y(N);
+        const double w = -kTwoPi * out.binFreqs[b] / fs;
+        for (int k = 0; k < K; ++k) {
+            const int off = k * N;
+            for (int n = 0; n < N; ++n) {
+                const double a = w * double(off + n);
+                const double c = std::cos(a), sn = std::sin(a);
+                const double x = sI[off + n], y = sQ[off + n];
+                X[n] = cplx(x * c - y * sn, x * sn + y * c);
+            }
+            fft.forward(X);
+            for (int p = 0; p < P; ++p) {
+                const cplx* C = codeSpec[p].data();
+                for (int n = 0; n < N; ++n) Y[n] = cmul(X[n], C[n]);
+                fft.inverse(Y);
+                float* dst = corr[p].data() + size_t(b) * N;
+                for (int n = 0; n < N; ++n) dst[n] += float(std::norm(Y[n]));
+            }
+        }
+        const int d = ++done;
+        if (progress) progress(d * 90 / nBins);
+    });
+    if (cancel && cancel->load()) {
+        out.error = QStringLiteral("Cancelled");
+        return out;
+    }
+
+    // ---- peak search, metrics, diagnostics and fine frequency
+    const double spc = double(N) / kCaCodeLength;   // samples per chip
+    const int excl = int(std::ceil(spc));
+    QtConcurrent::blockingMap(pIdx, [&](const int& p) {
+        AcqResult& r = out.results[p];
+        std::vector<float>& c = corr[p];
+        const size_t best = size_t(std::max_element(c.begin(), c.end()) - c.begin());
+        const int bStar = int(best / N);
+        const int tau = int(best % N);
+        r.peak = c[best];
+        r.peakBin = bStar;
+        r.codePhase = tau;
+        r.codePhaseChips = tau / spc;
+        r.coarseFreq = out.binFreqs[bStar];
+
+        const float* row = c.data() + size_t(bStar) * N;
+        double second = 0, sum = 0;
+        int cnt = 0;
+        for (int n = 0; n < N; ++n) {
+            int dist = std::abs(n - tau);
+            dist = std::min(dist, N - dist);
+            if (dist > excl) second = std::max(second, double(row[n]));
+            if (dist > 2 * excl) { sum += row[n]; ++cnt; }
+        }
+        r.secondPeak = second;
+        r.noiseMean = cnt > 0 ? sum / cnt : 0;
+        r.metric = second > 0 ? r.peak / second : 0;
+        const double snr = r.noiseMean > 0 ? (r.peak - r.noiseMean) / r.noiseMean : 0;
+        r.cn0 = 10.0 * std::log10(std::max(snr, 1e-3) / 1e-3);
+        r.acquired = r.metric > s.acqThreshold;
+
+        r.codeSlice.assign(row, row + N);
+        r.dopplerSlice.resize(nBins);
+        for (int bb = 0; bb < nBins; ++bb) r.dopplerSlice[bb] = c[size_t(bb) * N + tau];
+
+        const int cols = std::min(N, 2046);
+        r.surfaceCols = cols;
+        r.surface.assign(size_t(nBins) * cols, 0.0f);
+        for (int bb = 0; bb < nBins; ++bb) {
+            const float* src_ = c.data() + size_t(bb) * N;
+            for (int col = 0; col < cols; ++col) {
+                const int a0 = int((long long)col * N / cols);
+                const int a1 = std::max(a0 + 1, int((long long)(col + 1) * N / cols));
+                float m = 0;
+                for (int n = a0; n < a1; ++n) m = std::max(m, src_[n]);
+                r.surface[size_t(bb) * cols + col] = m;
+            }
+        }
+        std::vector<float>().swap(c);    // free full-resolution surface
+
+        fineFrequency(sI, sQ, got, fs, fineMs, r);
+        r.doppler = r.fineFreq - s.ifFreq;
+    });
+    if (progress) progress(100);
+    out.elapsedSec = timer.elapsed() / 1000.0;
+    return out;
+}
+
+} // namespace gnss
