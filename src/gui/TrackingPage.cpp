@@ -100,6 +100,11 @@ void TrackingPage::refresh()
     showChannel();
     fillAllChannels();
     fillSummary();
+    ui->shapePlot->clear();
+    ui->shapeTable->beginFill(0);
+    ui->shapeTable->endFill();
+    ui->shapeInfoLabel->clear();
+    if (cc->count() > 0) computeShape();   // so the correlator tab is not empty after tracking
 }
 
 void TrackingPage::selectPrn(int prn)

@@ -21,6 +21,8 @@ int main(int argc, char* argv[])
         else if (!args[i].startsWith(QLatin1String("--"))) file = args[i];
     }
 
+    if (!shots.isEmpty()) app.setFont(QFont(QStringLiteral("Segoe UI"), 9));   // deterministic font for offscreen rendering
+
     gui::MainWindow w;
     if (!shots.isEmpty()) {
         w.resize(1700, 1050);

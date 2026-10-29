@@ -87,6 +87,110 @@ SoftGpsReceiver <file.bin> --screenshots <dir>   # process, save a PNG of every 
 
 Processing the whole file takes about 13 s on a 12-core CPU: acquisition 2 s, tracking 9 s with one thread per channel.
 
+## Screenshots
+
+All screenshots below come from processing the sample recording. You can regenerate them with
+`SoftGpsReceiver <file.bin> --screenshots <dir>`.
+
+### Overview
+Recording parameters, pipeline status, a per-satellite summary (acquisition, tracking, bit sync, parity,
+ephemeris, health, elevation) and the built-in description of the algorithms.
+
+![Overview](docs/screenshots/01_Overview.png)
+
+### Raw signal
+Time-domain samples, ADC level histogram against a Gaussian, Welch power spectral density showing the
+front-end passband around the IF, spectrogram, and signal statistics.
+
+![Raw signal](docs/screenshots/02_Raw_signal.png)
+
+### C/A codes
+G1, G2<sub>i</sub> and C/A chip sequences, the three-valued autocorrelation, cross-correlation between two PRNs,
+the correlation peak sampled at the receiver rate, the 1 kHz line spectrum, and a table that checks all 32 codes
+against IS-GPS-200.
+
+![C/A codes](docs/screenshots/03_C-A_codes.png)
+
+### Acquisition
+Detection metric and C/N0 for every PRN, the full results table, and for the selected PRN: the code-phase ×
+Doppler correlation surface, code-phase and Doppler slices through the peak, and the fine-frequency search.
+
+![Acquisition](docs/screenshots/04_Acquisition.png)
+
+### Tracking
+**Channel detail:** prompt I/Q scatter, prompt correlator outputs (navigation bits), early/prompt/late
+envelopes, PLL, FLL and DLL discriminators, carrier Doppler, code NCO, C/N0, phase lock indicator, accumulated
+Doppler and code-epoch drift, all on linked time axes.
+
+![Tracking - channel detail](docs/screenshots/05_Tracking_Channel_detail.png)
+
+**All channels:** C/N0, Doppler, phase lock indicator and DLL error overlaid for every channel.
+
+![Tracking - all channels](docs/screenshots/06_Tracking_All_channels.png)
+
+**Correlator shape:** the correlation function recomputed with a bank of correlators from the stored NCO
+state, showing the peak rounded by the front-end filter, with the loop's early/prompt/late points on it.
+
+![Tracking - correlator shape](docs/screenshots/07_Tracking_Correlator_shape.png)
+
+**Summary & loop design:** per-channel statistics and the PLL/FLL/DLL loop-filter coefficients.
+
+![Tracking - summary and loop design](docs/screenshots/08_Tracking_Summary__loop_design.png)
+
+### Bit sync & data bits
+Histogram of prompt sign transitions modulo 20 ms, prompt I with the detected bit edges, the soft bits and their
+distribution, the bit stream correlated with the preamble (parity-verified subframe starts in red), and the raw
+bit grid.
+
+![Bit sync and data bits](docs/screenshots/09_Bit_sync__data_bits.png)
+
+### Navigation message
+Every decoded subframe (TOW, page, parity, polarity, flags). For the selected subframe: each word with its
+received and computed parity, a colour-coded map of the 300 bits by field, and every field with raw bits, scale
+factor, value, units and interpretation.
+
+![Navigation message](docs/screenshots/10_Navigation_message.png)
+
+### Ephemeris, almanac & health
+Broadcast ephemeris and clock parameters for all satellites, decoded almanac pages, satellite health from
+subframe 1, the almanac and the page-25 summaries, and the ionosphere/UTC, special-message, NMCT and
+received-pages tables.
+
+![Ephemeris](docs/screenshots/11_Ephemeris,_almanac__health_Ephemeris_%28subframes_1-3%29.png)
+
+![Almanac](docs/screenshots/12_Ephemeris,_almanac__health_Almanac.png)
+
+![Health and configuration](docs/screenshots/13_Ephemeris,_almanac__health_Health__configuration.png)
+
+![Iono, UTC and other pages](docs/screenshots/14_Ephemeris,_almanac__health_Iono_-_UTC__other_pages.png)
+
+### Satellites & orbits
+Sky plot with tracks, elevation over time, sub-satellite points, satellite position/velocity/clock at the
+selected epoch, and the IS-GPS-200 orbit computation step by step (including each Kepler iteration).
+
+![Satellites and orbits](docs/screenshots/15_Satellites__orbits.png)
+
+### Pseudoranges
+Every correction applied to each pseudorange at the selected epoch, with pseudorange change, post-fit residuals,
+code-minus-carrier, measured vs predicted Doppler, tropospheric delay and satellite clock correction over time.
+
+![Pseudoranges](docs/screenshots/16_Pseudoranges.png)
+
+### Position
+**Summary & plots:** mean position, accuracy statistics, horizontal scatter with CEP/2DRMS circles, E/N/U
+error, receiver clock bias and drift, DOP, satellites used, and Doppler velocity.
+
+![Position - summary and plots](docs/screenshots/17_Position_Summary__plots.png)
+
+**Solutions:** every epoch's fix (geodetic, ECEF, ENU, clock, DOP, velocity, residual RMS), exportable to CSV/KML.
+
+![Position - solutions](docs/screenshots/18_Position_Solutions.png)
+
+**Least-squares detail:** every Gauss–Newton iteration from the Earth's centre to convergence, the design
+matrix and residuals, and the cofactor matrix in the local E/N/U/clock frame.
+
+![Position - least-squares detail](docs/screenshots/19_Position_Least-squares_detail.png)
+
 ## Code structure
 
 ```
