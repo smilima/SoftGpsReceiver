@@ -11,8 +11,8 @@
 
 namespace gnss {
 
-// Everything recorded by one tracking channel, one entry per C/A code period
-// (~1 ms). All arrays have numMs elements.
+// Everything recorded by one tracking channel, one entry per code period: about
+// 1 ms for the GPS C/A code and 4 ms for Galileo E1. All arrays have numMs elements.
 struct TrackingChannel
 {
     int channel = 0;
@@ -22,6 +22,8 @@ struct TrackingChannel
     qint64 startSample = 0;
     double initCarrFreq = 0;
     int numMs = 0;
+    int periodMs = 1;                     // nominal code period, so 1 entry = periodMs milliseconds
+    int codeLength = 1023;                // chips
 
     std::vector<qint64> blockStart;       // first sample of the integration block
     std::vector<int> blockSize;           // samples integrated
@@ -30,7 +32,8 @@ struct TrackingChannel
     std::vector<double> codeFreq;         // NCO code frequency used for the block (chips/s)
     std::vector<double> remCarrPhase;     // carrier phase at block start (cycles)
     std::vector<double> remCodePhase;     // code phase at block start (chips)
-    std::vector<float> IE, IP, IL, QE, QP, QL;
+    std::vector<float> IE, IP, IL, QE, QP, QL;   // on E1 these belong to the E1-C pilot
+    std::vector<float> IB, QB;            // E1-B data prompt (Galileo only)
     std::vector<float> pllDisc;           // Costas discriminator atan(Q/I) (rad)
     std::vector<float> fllDisc;           // cross/dot FLL discriminator (Hz)
     std::vector<float> dllDisc;           // normalised early-minus-late envelope (chips)

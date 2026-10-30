@@ -28,15 +28,17 @@ bool SignalSource::open(const QString& path, SampleFormat fmt, qint64 skipBytes,
     }
     path_ = path;
     fmt_ = fmt;
+    samplesPerByte_ = 1;
     switch (fmt) {
     case SampleFormat::Int8Real:
     case SampleFormat::UInt8Real: bytesPerSample_ = 1; break;
     case SampleFormat::Int16Real: bytesPerSample_ = 2; break;
     case SampleFormat::Int8IQ:    bytesPerSample_ = 2; break;
     case SampleFormat::Int16IQ:   bytesPerSample_ = 4; break;
+    case SampleFormat::Packed2Real: bytesPerSample_ = 1; samplesPerByte_ = 4; break;
     }
     skip_ = std::clamp<qint64>(skipBytes, 0, fileSize_);
-    numSamples_ = (fileSize_ - skip_) / bytesPerSample_;
+    numSamples_ = (fileSize_ - skip_) / bytesPerSample_ * samplesPerByte_;
     return true;
 }
 
@@ -56,7 +58,7 @@ int SignalSource::read(qint64 start, int count, float* outI, float* outQ) const
 {
     if (!data_ || start < 0 || start >= numSamples_ || count <= 0) return 0;
     const int n = int(std::min<qint64>(count, numSamples_ - start));
-    const uchar* p = data_ + skip_ + start * bytesPerSample_;
+    const uchar* p = data_ + skip_ + start / samplesPerByte_ * bytesPerSample_;
     switch (fmt_) {
     case SampleFormat::Int8Real: {
         const int8_t* s = reinterpret_cast<const int8_t*>(p);
@@ -92,6 +94,16 @@ int SignalSource::read(qint64 start, int count, float* outI, float* outQ) const
             if (outQ) outQ[i] = float(b);
         }
         break;
+    case SampleFormat::Packed2Real: {
+        static const float level[4] = {1.0f, 3.0f, -3.0f, -1.0f};
+        const int first = int(start & 3);
+        for (int i = 0; i < n; ++i) {
+            const int k = first + i;
+            outI[i] = level[(p[k >> 2] >> (2 * (k & 3))) & 3];
+        }
+        if (outQ) std::fill(outQ, outQ + n, 0.0f);
+        break;
+    }
     }
     return n;
 }

@@ -21,4 +21,18 @@ constexpr int    kHalfWeek       = 302400;
 constexpr int    kBitsPerSubframe = 300;
 constexpr int    kMsPerBit       = 20;
 
+// Galileo E1 Open Service (OS SIS ICD Issue 2.1)
+constexpr double kMuGal          = 3.986004418e14;       // geocentric gravitational constant (m^3/s^2)
+constexpr double kRelFGal        = -4.442807309e-10;     // relativistic constant F (s/m^1/2)
+constexpr int    kE1CodeLength   = 4092;                 // primary code chips, also 1.023 Mchip/s
+constexpr int    kE1CodeMs       = 4;                    // primary code period (ms)
+constexpr int    kInavPartSymbols = 250;                 // symbols in a 1 s I/NAV page part
+
+// Satellite ids: a GPS satellite keeps its PRN, a Galileo satellite is 100 + SVID (E01 = 101).
+constexpr int    kGalileoIdBase  = 100;
+constexpr int    kGalileoMaxSv   = 36;                   // SVIDs with assigned codes
+
+constexpr bool isGalileo(int id) { return id > kGalileoIdBase; }
+constexpr int svidOf(int id) { return isGalileo(id) ? id - kGalileoIdBase : id; }
+
 } // namespace gnss

@@ -58,13 +58,15 @@ void AcquisitionPage::refresh()
 
     QVector<double> px, py, nx, ny, cx, cy, ux, uy;
     for (const auto& r : a.results) {
-        if (r.acquired) { px << r.prn; py << r.metric; cx << r.prn; cy << r.cn0; }
-        else { nx << r.prn; ny << r.metric; ux << r.prn; uy << r.cn0; }
+        const double sx = satAxis(r.prn);
+        if (r.acquired) { px << sx; py << r.metric; cx << sx; cy << r.cn0; }
+        else { nx << sx; ny << r.metric; ux << sx; uy << r.cn0; }
     }
     metric_->addSeries(tr("acquired"), px, py, PlotWidget::Bars, QColor(44, 160, 44));
     metric_->addSeries(tr("not acquired"), nx, ny, PlotWidget::Bars, QColor(160, 160, 160));
     metric_->series(0).barWidth = metric_->series(1).barWidth = 0.7;
     metric_->addHLine(s.acqThreshold, QColor(214, 39, 40), tr("threshold %1").arg(s.acqThreshold));
+    if (s.useGps() && s.useGalileo()) metric_->addVLine(34, QColor(127, 127, 127), tr("Galileo: E01 at 36"), Qt::DotLine);
     metric_->setYIncludesZero(true);
     metric_->autoScale();
     cn0_->addSeries(tr("acquired"), cx, cy, PlotWidget::Bars, QColor(31, 119, 180));
@@ -77,7 +79,7 @@ void AcquisitionPage::refresh()
     for (int i = 0; i < int(a.results.size()); ++i) {
         const AcqResult& r = a.results[size_t(i)];
         const QColor bg = r.acquired ? goodColor() : QColor();
-        table_->setNum(i, 0, r.prn, 0, bg);
+        table_->setText(i, 0, satLabel(r.prn), bg);
         table_->setKey(i, r.prn);
         table_->setText(i, 1, r.acquired ? tr("yes") : tr("no"), bg);
         table_->setNum(i, 2, r.metric, 3, bg);
@@ -104,14 +106,18 @@ void AcquisitionPage::refresh()
     };
     row(tr("Method"), tr("Parallel code-phase search (FFT circular correlation)"));
     row(tr("Data start sample"), QString::number(a.startSample));
-    row(tr("Coherent integration"), tr("1 ms (%1 samples)").arg(a.samplesPerCode));
-    row(tr("Non-coherent blocks"), QString::number(a.nonCoherent));
-    row(tr("FFT length / internal"), tr("%1 / %2 (Bluestein for non-power-of-2)").arg(a.fftSize).arg(a.fftInternalSize));
-    row(tr("Doppler bins"), tr("%1 bins of %2 Hz, %3 .. %4 Hz").arg(a.binFreqs.size()).arg(s.acqStep)
-                                .arg(a.binFreqs.empty() ? 0 : a.binFreqs.front() - s.ifFreq)
-                                .arg(a.binFreqs.empty() ? 0 : a.binFreqs.back() - s.ifFreq));
-    row(tr("Threshold"), QString::number(s.acqThreshold));
-    row(tr("Fine frequency"), tr("%1 ms, squared 0.5-ms correlations (bit-transition insensitive)").arg(s.fineFreqMs));
+    if (s.useGps()) {
+        row(tr("Coherent integration"), tr("1 ms (%1 samples)").arg(a.samplesPerCode));
+        row(tr("Non-coherent blocks"), QString::number(a.nonCoherent));
+        row(tr("FFT length / internal"), tr("%1 / %2 (Bluestein for non-power-of-2)").arg(a.fftSize).arg(a.fftInternalSize));
+        row(tr("Doppler bins"), tr("%1 bins of %2 Hz, %3 .. %4 Hz").arg(a.binFreqs.size()).arg(s.acqStep)
+                                    .arg(a.binFreqs.empty() ? 0 : a.binFreqs.front() - s.ifFreq)
+                                    .arg(a.binFreqs.empty() ? 0 : a.binFreqs.back() - s.ifFreq));
+        row(tr("Threshold"), QString::number(s.acqThreshold));
+        row(tr("Fine frequency"), tr("%1 ms, squared 0.5-ms correlations (bit-transition insensitive)").arg(s.fineFreqMs));
+    }
+    if (s.useGalileo())
+        row(tr("Galileo E1"), tr("4 ms replica against 8 ms windows, %1 blocks; E1-B and E1-C must peak together").arg(s.galNonCoherent));
     row(tr("Processing time"), tr("%1 s").arg(a.elapsedSec, 0, 'f', 2));
     params_->endFill();
 
@@ -141,33 +147,39 @@ void AcquisitionPage::showPrn(int prn)
     const AcqResult* r = nullptr;
     for (const auto& x : a.results)
         if (x.prn == prn) r = &x;
-    if (!r || a.binFreqs.empty()) return;
+    if (!r) return;
+    const bool gal = isGalileo(prn);
+    const std::vector<double>& binFreqs = gal ? r->binFreqs : a.binFreqs;
+    if (binFreqs.size() < 2) return;
     prn_ = prn;
     const ReceiverSettings& s = rx_->settings;
-    const int N = a.samplesPerCode;
+    const int N = gal ? int(r->codeSlice.size()) : a.samplesPerCode;      // the E1 slice is decimated
+    const double period = gal ? kE1CodeMs * s.samplingFreq / 1000.0 : N;  // samples per code period
     const bool chips = ui->chipsAxisCheck->isChecked();
-    const double xmax = chips ? kCaCodeLength : N;
-    const double nb = double(a.binFreqs.size());
-    const double d0 = a.binFreqs.front() - s.ifFreq - s.acqStep / 2, d1 = a.binFreqs.back() - s.ifFreq + s.acqStep / 2;
+    const double xmax = chips ? (gal ? kE1CodeLength : kCaCodeLength) : period;
+    const double nb = double(binFreqs.size());
+    const double binStep = gal ? binFreqs[1] - binFreqs[0] : s.acqStep;
+    const double d0 = binFreqs.front() - s.ifFreq - binStep / 2, d1 = binFreqs.back() - s.ifFreq + binStep / 2;
 
     surface_->clear();
-    surface_->setLabels(tr("PRN %1 correlation surface |R(tau, fd)|^2 (%2 x %3 cells, max-pooled)")
-                            .arg(prn).arg(r->surfaceCols).arg(int(nb)),
+    surface_->setLabels(tr("%1 correlation surface |R(tau, fd)|^2 (%2 x %3 cells, max-pooled)")
+                            .arg(satName(prn)).arg(r->surfaceCols).arg(int(nb)),
                         chips ? tr("Code phase (chips)") : tr("Code phase (samples)"), tr("Doppler (Hz)"));
     surface_->setHeatmap(QVector<float>(r->surface.begin(), r->surface.end()), r->surfaceCols, int(nb), 0, xmax, d0, d1, tr("log10 power"), true);
 
-    const double scale = chips ? double(kCaCodeLength) / N : 1.0;
+    const double scale = xmax / N;
     codeSlice_->clear();
     codeSlice_->setLabels(tr("Code-phase slice at Doppler %1 Hz (zoom in to see the correlation triangle)")
-                              .arg(a.binFreqs[size_t(r->peakBin)] - s.ifFreq),
+                              .arg(binFreqs[size_t(r->peakBin)] - s.ifFreq),
                           chips ? tr("Code phase (chips)") : tr("Code phase (samples)"), tr("Correlation power"));
     codeSlice_->addSeries(tr("|R|^2"), range(N, scale), toQ(r->codeSlice), PlotWidget::Lines, QColor(31, 119, 180), 1.0);
     codeSlice_->addHLine(r->secondPeak, QColor(255, 127, 14), tr("second peak"), Qt::DotLine);
     codeSlice_->addHLine(r->noiseMean, QColor(127, 127, 127), tr("noise mean"), Qt::DotLine);
-    codeSlice_->addVLine(r->codePhase * scale, QColor(214, 39, 40), tr("peak %1").arg(r->codePhase * scale, 0, 'f', 2));
+    const double peakX = r->codePhase * xmax / period;
+    codeSlice_->addVLine(peakX, QColor(214, 39, 40), tr("peak %1").arg(peakX, 0, 'f', 2));
 
     QVector<double> dx, dy;
-    for (size_t b = 0; b < a.binFreqs.size(); ++b) { dx << a.binFreqs[b] - s.ifFreq; dy << r->dopplerSlice[b]; }
+    for (size_t b = 0; b < binFreqs.size(); ++b) { dx << binFreqs[b] - s.ifFreq; dy << r->dopplerSlice[b]; }
     dopSlice_->clear();
     dopSlice_->setLabels(tr("Doppler slice at code phase %1").arg(r->codePhase), tr("Doppler (Hz, relative to nominal IF)"),
                          tr("Correlation power"));
@@ -175,12 +187,13 @@ void AcquisitionPage::showPrn(int prn)
     dopSlice_->addVLine(r->doppler, QColor(214, 39, 40), tr("fine %1 Hz").arg(r->doppler, 0, 'f', 1));
 
     fine_->clear();
-    fine_->setLabels(tr("Fine frequency search: spectrum of squared 0.5-ms correlations"),
+    fine_->setLabels(gal ? tr("Fine frequency search: spectrum of squared 2-ms pilot correlations")
+                         : tr("Fine frequency search: spectrum of squared 0.5-ms correlations"),
                      tr("Frequency offset from coarse bin (Hz)"), tr("Magnitude"));
     if (!r->fineAxis.empty()) {
         fine_->addSeries(tr("|DFT(P^2)|"), toQ(r->fineAxis), toQ(r->fineSpectrum), PlotWidget::Lines, QColor(148, 103, 189), 1.2);
         fine_->addVLine(r->fineDelta, QColor(214, 39, 40), tr("%1 Hz").arg(r->fineDelta, 0, 'f', 1));
-        fine_->addSpan(-s.acqStep / 2, s.acqStep / 2, QColor(44, 160, 44, 30));
+        fine_->addSpan(-binStep / 2, binStep / 2, QColor(44, 160, 44, 30));
     }
 }
 

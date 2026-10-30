@@ -54,7 +54,7 @@ void EphemerisPage::fillEphemeris()
     for (const auto& n : rx_->nav)
         if (n.eph.sf1 || n.eph.sf2 || n.eph.sf3) chans.push_back(&n);
     QStringList cols{tr("Parameter"), tr("Units")};
-    for (const auto* n : chans) cols << tr("PRN %1").arg(n->prn);
+    for (const auto* n : chans) cols << satName(n->prn);
     t->setColumns(cols);
 
     using Getter = std::function<QString(const Ephemeris&)>;
@@ -63,32 +63,33 @@ void EphemerisPage::fillEphemeris()
     auto sci = [](double v) { return QString::number(v, 'e', 10); };
     const double r2d = 180.0 / kGpsPi;
     const double r2sc = 1.0 / kGpsPi;
+    const auto mu = [](const Ephemeris& e) { return isGalileo(e.prn) ? kMuGal : kMu; };
     const std::vector<Row> rows = {
         {tr("Subframes complete (1/2/3)"), "", [](const Ephemeris& e) { return QStringLiteral("%1 %2 %3").arg(e.sf1 ? "1" : "-").arg(e.sf2 ? "2" : "-").arg(e.sf3 ? "3" : "-"); }},
         {tr("IODC / IODE(SF2) / IODE(SF3)"), "", [](const Ephemeris& e) { return QStringLiteral("%1 / %2 / %3").arg(e.iodc).arg(e.iode2).arg(e.iode3); }},
         {tr("Issue-of-data consistency"), "", [](const Ephemeris& e) { return e.consistent() ? QStringLiteral("consistent") : QStringLiteral("MISMATCH"); }},
         {tr("Week number (mod 1024)"), tr("weeks"), [](const Ephemeris& e) { return QString::number(e.weekNumber); }},
-        {tr("Codes on L2"), "", [](const Ephemeris& e) { return nav::l2CodeText(e.l2Code); }},
-        {tr("L2 P data flag"), "", [](const Ephemeris& e) { return QString::number(e.l2pFlag); }},
-        {tr("URA index"), "", [](const Ephemeris& e) { return QStringLiteral("%1 (%2)").arg(e.uraIndex).arg(nav::uraText(e.uraIndex)); }},
-        {tr("SV health"), "", [](const Ephemeris& e) { return QStringLiteral("%1: %2").arg(e.svHealth).arg(nav::health6Text(e.svHealth)); }},
-        {tr("T_GD"), tr("ns"), [=](const Ephemeris& e) { return num(e.tgd * 1e9, 3); }},
+        {tr("Codes on L2"), "", [](const Ephemeris& e) { return isGalileo(e.prn) ? QStringLiteral("-") : nav::l2CodeText(e.l2Code); }},
+        {tr("L2 P data flag"), "", [](const Ephemeris& e) { return isGalileo(e.prn) ? QStringLiteral("-") : QString::number(e.l2pFlag); }},
+        {tr("URA index (Galileo: SISA index)"), "", [](const Ephemeris& e) { return isGalileo(e.prn) ? QString::number(e.uraIndex) : QStringLiteral("%1 (%2)").arg(e.uraIndex).arg(nav::uraText(e.uraIndex)); }},
+        {tr("SV health"), "", [](const Ephemeris& e) { return isGalileo(e.prn) ? (e.svHealth ? QStringLiteral("%1: not healthy or not guaranteed").arg(e.svHealth) : QStringLiteral("0: signal OK, data valid")) : QStringLiteral("%1: %2").arg(e.svHealth).arg(nav::health6Text(e.svHealth)); }},
+        {tr("T_GD (Galileo: BGD(E1,E5b))"), tr("ns"), [=](const Ephemeris& e) { return num(e.tgd * 1e9, 3); }},
         {tr("t_oc"), tr("s"), [=](const Ephemeris& e) { return QStringLiteral("%1 (%2)").arg(e.toc, 0, 'f', 0).arg(nav::towText(e.toc)); }},
         {tr("a_f0 (clock bias)"), tr("s"), [=](const Ephemeris& e) { return sci(e.af0); }},
         {tr("a_f0 as range"), tr("km"), [=](const Ephemeris& e) { return num(e.af0 * kSpeedOfLight / 1000, 4); }},
         {tr("a_f1 (clock drift)"), tr("s/s"), [=](const Ephemeris& e) { return sci(e.af1); }},
         {tr("a_f2 (drift rate)"), tr("s/s^2"), [=](const Ephemeris& e) { return sci(e.af2); }},
         {tr("t_oe"), tr("s"), [=](const Ephemeris& e) { return QStringLiteral("%1 (%2)").arg(e.toe, 0, 'f', 0).arg(nav::towText(e.toe)); }},
-        {tr("Fit interval flag"), "", [](const Ephemeris& e) { return e.fitFlag ? QStringLiteral("> 4 hours") : QStringLiteral("4 hours"); }},
-        {tr("AODO"), tr("s"), [](const Ephemeris& e) { return QString::number(e.aodo); }},
+        {tr("Fit interval flag"), "", [](const Ephemeris& e) { return isGalileo(e.prn) ? QStringLiteral("-") : e.fitFlag ? QStringLiteral("> 4 hours") : QStringLiteral("4 hours"); }},
+        {tr("AODO"), tr("s"), [](const Ephemeris& e) { return isGalileo(e.prn) ? QStringLiteral("-") : QString::number(e.aodo); }},
         {tr("sqrt(A)"), tr("m^1/2"), [=](const Ephemeris& e) { return num(e.sqrtA, 6); }},
         {tr("A (semi-major axis)"), tr("km"), [=](const Ephemeris& e) { return num(e.sqrtA * e.sqrtA / 1000, 3); }},
         {tr("e (eccentricity)"), "", [=](const Ephemeris& e) { return num(e.e, 10); }},
         {tr("Perigee / apogee altitude"), tr("km"), [=](const Ephemeris& e) {
              const double A = e.sqrtA * e.sqrtA;
              return QStringLiteral("%1 / %2").arg((A * (1 - e.e) - kWgs84A) / 1000, 0, 'f', 1).arg((A * (1 + e.e) - kWgs84A) / 1000, 0, 'f', 1); }},
-        {tr("Mean motion n0"), tr("rad/s"), [=](const Ephemeris& e) { const double A = e.sqrtA * e.sqrtA; return sci(std::sqrt(kMu / (A * A * A))); }},
-        {tr("Orbital period"), tr("h"), [=](const Ephemeris& e) { const double A = e.sqrtA * e.sqrtA; return num(kTwoPi * std::sqrt(A * A * A / kMu) / 3600, 5); }},
+        {tr("Mean motion n0"), tr("rad/s"), [=](const Ephemeris& e) { const double A = e.sqrtA * e.sqrtA; return sci(std::sqrt(mu(e) / (A * A * A))); }},
+        {tr("Orbital period"), tr("h"), [=](const Ephemeris& e) { const double A = e.sqrtA * e.sqrtA; return num(kTwoPi * std::sqrt(A * A * A / mu(e)) / 3600, 5); }},
         {tr("Delta n"), tr("semicircles/s"), [=](const Ephemeris& e) { return sci(e.deltaN * r2sc); }},
         {tr("M_0 (mean anomaly)"), tr("deg"), [=](const Ephemeris& e) { return num(e.m0 * r2d, 8); }},
         {tr("omega (argument of perigee)"), tr("deg"), [=](const Ephemeris& e) { return num(e.omega * r2d, 8); }},
@@ -215,6 +216,20 @@ void EphemerisPage::fillIonoAndPages()
         row(tr("Delta t_LS"), QString::number(u.dtls), "s", tr("current leap seconds"));
         row(tr("WN_LSF / DN"), QStringLiteral("%1 / %2").arg(u.wnlsf).arg(u.dn), QString(), tr("leap second event"));
         row(tr("Delta t_LSF"), QString::number(u.dtlsf), "s", tr("leap seconds after the event"));
+    }
+    const GalileoGlobal& gg = g.galileo;
+    if (gg.ionoValid) {
+        row(tr("Galileo a_i0 / a_i1 / a_i2"), QStringLiteral("%1 / %2 / %3").arg(gg.ai0).arg(gg.ai1, 0, 'e', 4).arg(gg.ai2, 0, 'e', 4),
+            tr("sfu, sfu/deg, sfu/deg^2"), tr("for the NeQuick model, which this receiver does not implement"));
+    }
+    if (gg.utcValid) {
+        row(tr("Galileo A_0 / A_1"), QStringLiteral("%1 / %2").arg(gg.A0, 0, 'e', 6).arg(gg.A1, 0, 'e', 6), tr("s, s/s"), tr("GST-UTC"));
+        row(tr("Galileo Delta t_LS"), QString::number(gg.dtLs), "s", tr("current leap seconds"));
+    }
+    if (gg.ggtoValid) {
+        row(tr("A_0G"), QStringLiteral("%1 ns").arg(gg.a0g * 1e9, 0, 'f', 3), QString(), tr("GPS to Galileo time offset"));
+        row(tr("A_1G"), QString::number(gg.a1g, 'e', 4), "s/s", tr("drift of that offset"));
+        row(tr("t_0G / WN_0G"), QStringLiteral("%1 / %2").arg(gg.t0g).arg(gg.wn0g), QString());
     }
     it->endFill();
 

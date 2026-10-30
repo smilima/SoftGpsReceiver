@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Constants.h"
 #include "Settings.h"
 #include "Tracking.h"
 
 #include <QString>
 #include <QVector>
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
@@ -78,6 +80,22 @@ struct Subframe
     quint64 bits(int start1, int len) const;   // from dataBits, 1-based
 };
 
+// One Galileo I/NAV word: the payload of an even and odd page part.
+struct InavWord
+{
+    int startMs = 0;             // tracking index of the first sync symbol of the even part
+    bool inverted = false;       // carrier 180-degree ambiguity, resolved by the sync pattern
+    bool crcOk = false;
+    int type = -1;
+    bool hasTow = false;
+    double tow = 0;              // GST time of week at startMs (s), when the word carries it
+    std::array<uint8_t, 128> bits{};
+
+    quint64 field(int start, int len) const;   // 0-based, as counted from the word type
+};
+
+// For Galileo the fields hold the I/NAV equivalents: sf1..sf3 are all set once words 1 to 5 are in, iode2, iode3 and
+// iodc hold IODnav from words 1, 3 and 4, uraIndex the SISA index, tgd BGD(E1,E5b), svHealth 2*E1-BHS + E1-BDVS.
 struct Ephemeris
 {
     int prn = 0;
@@ -94,7 +112,10 @@ struct Ephemeris
     double cic = 0, omega0 = 0, cis = 0, i0 = 0, crc = 0, omega = 0, omegaDot = 0, idot = 0;
 
     bool complete() const { return sf1 && sf2 && sf3; }
-    bool consistent() const { return complete() && iode2 == iode3 && (iodc & 0xFF) == iode2; }
+    bool consistent() const
+    {
+        return complete() && iode2 == iode3 && (isGalileo(prn) ? iodc == iode2 : (iodc & 0xFF) == iode2);
+    }
 };
 
 struct AlmanacEntry
@@ -150,16 +171,43 @@ struct NavChannel
     std::vector<int> preambleVerified;
 
     std::vector<Subframe> subframes;
+    std::vector<InavWord> inavWords;     // Galileo only; the bit sync fields then describe page sync
+    int inavTowErrors = 0;               // words whose TOW disagrees with the page count
+    // Decoded data that passes its check proves the channel was really tracking at that moment, which the
+    // lock indicator cannot do at low C/N0. These are the tracking indices of the words of fully parity-checked GPS
+    // subframes, or of I/NAV words passing the CRC.
+    std::vector<int> verifiedMs;
+    int verifySpan = 10000;              // how far from one of them a measurement may lie, in tracking indices
+    bool verifiedAt(double ms) const
+    {
+        const auto it = std::lower_bound(verifiedMs.begin(), verifiedMs.end(), int(ms) - verifySpan);
+        return it != verifiedMs.end() && *it <= int(ms) + verifySpan;
+    }
     Ephemeris eph;
 
-    // timing: transmit time of the code epoch at tracking ms index refMs
+    // timing: transmit time of the code epoch at tracking index refMs
     bool timingValid = false;
     int refMs = 0;
     double refTow = 0;
-    double txTimeAtMs(double ms) const { return refTow + (ms - refMs) * 1e-3; }
+    double epochSec = 1e-3;              // duration of one tracking index
+    double txTimeAtMs(double ms) const { return refTow + (ms - refMs) * epochSec; }
 
-    int parityOkWords = 0, parityTotalWords = 0;
+    int parityOkWords = 0, parityTotalWords = 0;   // for Galileo: I/NAV words passing the CRC
     QString status;
+};
+
+// Galileo system parameters from I/NAV words 5, 6 and 10
+struct GalileoGlobal
+{
+    int sourcePrn = 0;
+    bool ionoValid = false;
+    double ai0 = 0, ai1 = 0, ai2 = 0;    // effective ionisation level coefficients (for NeQuick)
+    bool utcValid = false;
+    double A0 = 0, A1 = 0;
+    int dtLs = 0, t0t = 0, wn0t = 0, wnLsf = 0, dn = 0, dtLsf = 0;
+    bool ggtoValid = false;              // GPS to Galileo time offset
+    double a0g = 0, a1g = 0;
+    int t0g = 0, wn0g = 0;
 };
 
 struct GlobalNavData
@@ -178,6 +226,7 @@ struct GlobalNavData
     std::map<int, std::vector<int>> nmct;   // prn -> [AI, ERD1..ERD30]
     std::vector<PageRecord> pages;
     int weekNumber = -1;                     // 10-bit week from subframe 1
+    GalileoGlobal galileo;
 
     GlobalNavData();
 };

@@ -22,6 +22,7 @@
          <item><property name="text"><string>int16 real (little endian)</string></property></item>
          <item><property name="text"><string>int8 complex I/Q interleaved</string></property></item>
          <item><property name="text"><string>int16 complex I/Q interleaved</string></property></item>
+         <item><property name="text"><string>2-bit real, packed</string></property></item>
         </widget>
        </item>
        <item row="1" column="0"><widget class="QLabel" name="fsLabel"><property name="text"><string>Sampling frequency</string></property></widget></item>
@@ -68,7 +69,7 @@
      <widget class="QWidget" name="acqTab">
       <attribute name="title"><string>Acquisition</string></attribute>
       <layout class="QFormLayout" name="acqForm">
-       <item row="0" column="0"><widget class="QLabel" name="prnsLabel"><property name="text"><string>PRNs to search</string></property></widget></item>
+       <item row="0" column="0"><widget class="QLabel" name="prnsLabel"><property name="text"><string>GPS PRNs to search</string></property></widget></item>
        <item row="0" column="1"><widget class="QLineEdit" name="prnsEdit"><property name="toolTip"><string>Comma separated list or ranges, e.g. 1-32 or 1,3,5-9</string></property></widget></item>
        <item row="1" column="0"><widget class="QLabel" name="acqStartLabel"><property name="text"><string>Acquisition data start</string></property></widget></item>
        <item row="1" column="1"><widget class="QSpinBox" name="acqStartSpin"><property name="suffix"><string> ms</string></property><property name="maximum"><number>1000000</number></property></widget></item>
@@ -82,13 +83,23 @@
        <item row="5" column="1"><widget class="QDoubleSpinBox" name="acqThrSpin"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>20.000000000000000</double></property><property name="singleStep"><double>0.100000000000000</double></property></widget></item>
        <item row="6" column="0"><widget class="QLabel" name="fineMsLabel"><property name="text"><string>Fine frequency data length</string></property></widget></item>
        <item row="6" column="1"><widget class="QSpinBox" name="fineMsSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>10</number></property><property name="maximum"><number>200</number></property></widget></item>
+       <item row="7" column="0"><widget class="QLabel" name="constellationLabel"><property name="text"><string>Constellations</string></property></widget></item>
+       <item row="7" column="1">
+        <widget class="QComboBox" name="constellationCombo">
+         <item><property name="text"><string>GPS + Galileo</string></property></item>
+         <item><property name="text"><string>GPS only</string></property></item>
+         <item><property name="text"><string>Galileo only</string></property></item>
+        </widget>
+       </item>
+       <item row="8" column="0"><widget class="QLabel" name="galNonCohLabel"><property name="text"><string>Galileo E1 non-coherent integration</string></property></widget></item>
+       <item row="8" column="1"><widget class="QSpinBox" name="galNonCohSpin"><property name="suffix"><string> x 4 ms</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>25</number></property></widget></item>
       </layout>
      </widget>
      <!-- ============================================================ Tracking -->
      <widget class="QWidget" name="trkTab">
       <attribute name="title"><string>Tracking</string></attribute>
       <layout class="QFormLayout" name="trkForm">
-       <item row="0" column="0"><widget class="QLabel" name="channelsLabel"><property name="text"><string>Number of channels</string></property></widget></item>
+       <item row="0" column="0"><widget class="QLabel" name="channelsLabel"><property name="text"><string>Channels per constellation</string></property></widget></item>
        <item row="0" column="1"><widget class="QSpinBox" name="channelsSpin"><property name="minimum"><number>1</number></property><property name="maximum"><number>32</number></property></widget></item>
        <item row="1" column="0"><widget class="QLabel" name="pllBwLabel"><property name="text"><string>PLL noise bandwidth</string></property></widget></item>
        <item row="1" column="1"><widget class="QDoubleSpinBox" name="pllBwSpin"><property name="suffix"><string> Hz</string></property><property name="decimals"><number>1</number></property><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>100.000000000000000</double></property></widget></item>
@@ -107,6 +118,8 @@
        <item row="8" column="1"><widget class="QCheckBox" name="aidingCheck"><property name="text"><string>Carrier-aided DLL</string></property></widget></item>
        <item row="9" column="0"><widget class="QLabel" name="cn0WinLabel"><property name="text"><string>C/N0 estimator window</string></property></widget></item>
        <item row="9" column="1"><widget class="QSpinBox" name="cn0WinSpin"><property name="suffix"><string> ms</string></property><property name="minimum"><number>20</number></property><property name="maximum"><number>2000</number></property></widget></item>
+       <item row="10" column="0"><widget class="QLabel" name="galDllSpacingLabel"><property name="text"><string>Galileo E1 early/late offset</string></property></widget></item>
+       <item row="10" column="1"><widget class="QDoubleSpinBox" name="galDllSpacingSpin"><property name="suffix"><string> chips</string></property><property name="decimals"><number>3</number></property><property name="minimum"><double>0.05</double></property><property name="maximum"><double>0.25</double></property><property name="singleStep"><double>0.01</double></property></widget></item>
       </layout>
      </widget>
      <!-- ============================================================ Navigation -->

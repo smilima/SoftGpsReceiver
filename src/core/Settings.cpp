@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Constants.h"
 
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -15,8 +16,15 @@ QString sampleFormatName(SampleFormat f)
     case SampleFormat::Int16Real: return QStringLiteral("int16 real (little endian)");
     case SampleFormat::Int8IQ:    return QStringLiteral("int8 complex I/Q interleaved");
     case SampleFormat::Int16IQ:   return QStringLiteral("int16 complex I/Q interleaved");
+    case SampleFormat::Packed2Real: return QStringLiteral("2-bit real, packed");
     }
     return QStringLiteral("?");
+}
+
+QString satName(int id)
+{
+    if (isGalileo(id)) return QStringLiteral("E%1").arg(svidOf(id), 2, 10, QLatin1Char('0'));
+    return QStringLiteral("PRN %1").arg(id);
 }
 
 ReceiverSettings::ReceiverSettings()
@@ -38,7 +46,8 @@ int ReceiverSettings::bytesPerSample() const
 {
     switch (format) {
     case SampleFormat::Int8Real:
-    case SampleFormat::UInt8Real: return 1;
+    case SampleFormat::UInt8Real:
+    case SampleFormat::Packed2Real: return 1;
     case SampleFormat::Int16Real: return 2;
     case SampleFormat::Int8IQ:    return 2;
     case SampleFormat::Int16IQ:   return 4;
@@ -83,7 +92,9 @@ bool ReceiverSettings::parseFileName(const QString& path, double* fs, double* fi
     if (fmt) {
         const QString lower = base.toLower();
         const bool iq = lower.contains(QLatin1String("iq")) || lower.contains(QLatin1String("complex"));
-        if (lower.contains(QLatin1String("int16")) || lower.contains(QLatin1String("i16")))
+        if (lower.contains(QLatin1String("2bit")))
+            *fmt = SampleFormat::Packed2Real;
+        else if (lower.contains(QLatin1String("int16")) || lower.contains(QLatin1String("i16")))
             *fmt = iq ? SampleFormat::Int16IQ : SampleFormat::Int16Real;
         else if (lower.contains(QLatin1String("uint8")) || lower.contains(QLatin1String("u8")))
             *fmt = SampleFormat::UInt8Real;
@@ -106,6 +117,9 @@ QString ReceiverSettings::summary() const
 void ReceiverSettings::save(QSettings& s) const
 {
     s.beginGroup(QStringLiteral("receiver"));
+    s.setValue("constellations", int(constellations));
+    s.setValue("galNonCoherent", galNonCoherent);
+    s.setValue("galDllSpacing", galDllSpacing);
     s.setValue("acqStartMs", acqStartMs);
     s.setValue("acqSearchBand", acqSearchBand);
     s.setValue("acqStep", acqStep);
@@ -138,6 +152,9 @@ void ReceiverSettings::load(QSettings& s)
 {
     ReceiverSettings d;
     s.beginGroup(QStringLiteral("receiver"));
+    constellations = Constellations(s.value("constellations", int(d.constellations)).toInt());
+    galNonCoherent = s.value("galNonCoherent", d.galNonCoherent).toInt();
+    galDllSpacing = s.value("galDllSpacing", d.galDllSpacing).toDouble();
     acqStartMs = s.value("acqStartMs", d.acqStartMs).toInt();
     acqSearchBand = s.value("acqSearchBand", d.acqSearchBand).toDouble();
     acqStep = s.value("acqStep", d.acqStep).toDouble();

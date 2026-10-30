@@ -305,12 +305,12 @@ void MainWindow::onAbout()
 {
     QMessageBox::about(this, tr("About Software GPS Receiver"),
                        tr("<h3>Software GPS Receiver</h3>"
-                          "<p>A post-processing GPS L1 C/A receiver for recorded IF samples, built to expose every "
+                          "<p>A post-processing GPS L1 C/A and Galileo E1 receiver for recorded IF samples, built to expose every "
                           "step of the signal processing: raw signal statistics, C/A code generation, FFT-based "
                           "acquisition, FLL-assisted PLL / DLL tracking, bit synchronisation, LNAV decoding with "
                           "parity, ephemeris/almanac/health, satellite orbits, pseudoranges and least-squares "
                           "position, velocity and time.</p>"
-                          "<p>Reference: IS-GPS-200; K. Borre et al., <i>A Software-Defined GPS and Galileo Receiver</i>; "
+                          "<p>Reference: IS-GPS-200; Galileo OS SIS ICD Issue 2.1; K. Borre et al., <i>A Software-Defined GPS and Galileo Receiver</i>; "
                           "E. D. Kaplan, <i>Understanding GPS</i>.</p>"
                           "<p>Built with Qt %1.</p>").arg(QT_VERSION_STR));
 }

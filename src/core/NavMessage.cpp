@@ -1,4 +1,5 @@
 #include "NavMessage.h"
+#include "GalileoNav.h"
 #include "Constants.h"
 
 #include <QHash>
@@ -15,6 +16,13 @@ GlobalNavData::GlobalNavData()
         svConfig[i] = 0;
         svConfigValid[i] = false;
     }
+}
+
+quint64 InavWord::field(int start, int len) const
+{
+    quint64 v = 0;
+    for (int i = 0; i < len; ++i) v = (v << 1) | bits[size_t(start + i)];
+    return v;
 }
 
 quint64 Subframe::bits(int start1, int len) const
@@ -644,6 +652,7 @@ void assembleEphemeris(NavChannel& nc)
 
 NavChannel decodeChannel(const TrackingChannel& trk, const ReceiverSettings& s)
 {
+    if (isGalileo(trk.prn)) return inav::decodeChannel(trk, s);
     NavChannel nc;
     nc.channel = trk.channel;
     nc.prn = trk.prn;
@@ -760,6 +769,10 @@ NavChannel decodeChannel(const TrackingChannel& trk, const ReceiverSettings& s)
             sf.towConsistent = !(sf.words[1].parityOk) || std::fabs(expected - sf.towStart) < 1e-6;
         }
     }
+    // Whole subframes only: the 6-bit parity of a single word passes by chance one time in 64 on a lost channel
+    for (const Subframe& sf : nc.subframes)
+        if (sf.allParityOk())
+            for (int w = 0; w < 10; ++w) nc.verifiedMs.push_back(sf.startMs + w * 600);
     assembleEphemeris(nc);
     nc.status = nc.eph.complete() ? QStringLiteral("Ephemeris complete")
                                   : QStringLiteral("Ephemeris incomplete (SF1:%1 SF2:%2 SF3:%3)")
@@ -767,11 +780,46 @@ NavChannel decodeChannel(const TrackingChannel& trk, const ReceiverSettings& s)
     return nc;
 }
 
+static void collectGalileo(const NavChannel& nc, GalileoGlobal& g)
+{
+    const auto signedField = [](const InavWord& w, int start, int len) {
+        const quint64 u = w.field(start, len);
+        return (u >> (len - 1)) & 1 ? qint64(u) - (qint64(1) << len) : qint64(u);
+    };
+    for (const InavWord& w : nc.inavWords) {
+        if (!w.crcOk) continue;
+        if (w.type == 5 && !g.ionoValid) {
+            g.ionoValid = true;
+            g.sourcePrn = nc.prn;
+            g.ai0 = double(w.field(6, 11)) * std::ldexp(1.0, -2);
+            g.ai1 = double(signedField(w, 17, 11)) * std::ldexp(1.0, -8);
+            g.ai2 = double(signedField(w, 28, 14)) * std::ldexp(1.0, -15);
+        } else if (w.type == 6 && !g.utcValid) {
+            g.utcValid = true;
+            g.A0 = double(signedField(w, 6, 32)) * std::ldexp(1.0, -30);
+            g.A1 = double(signedField(w, 38, 24)) * std::ldexp(1.0, -50);
+            g.dtLs = int(signedField(w, 62, 8));
+            g.t0t = int(w.field(70, 8)) * 3600;
+            g.wn0t = int(w.field(78, 8));
+            g.wnLsf = int(w.field(86, 8));
+            g.dn = int(w.field(94, 3));
+            g.dtLsf = int(signedField(w, 97, 8));
+        } else if (w.type == 10 && !g.ggtoValid) {
+            g.ggtoValid = true;
+            g.a0g = double(signedField(w, 86, 16)) * std::ldexp(1.0, -35);
+            g.a1g = double(signedField(w, 102, 12)) * std::ldexp(1.0, -51);
+            g.t0g = int(w.field(114, 8)) * 3600;
+            g.wn0g = int(w.field(122, 6));
+        }
+    }
+}
+
 void collectGlobal(const std::vector<NavChannel>& channels, GlobalNavData& g)
 {
     g = GlobalNavData();
     for (const NavChannel& nc : channels) {
-        if (nc.eph.sf1 && g.weekNumber < 0) g.weekNumber = nc.eph.weekNumber;
+        if (nc.eph.sf1 && g.weekNumber < 0) g.weekNumber = nc.eph.weekNumber % 1024;
+        collectGalileo(nc, g.galileo);
         for (const Subframe& sf : nc.subframes) {
             if (sf.id != 4 && sf.id != 5) continue;
             PageRecord pr;

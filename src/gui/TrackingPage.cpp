@@ -34,7 +34,7 @@ TrackingPage::TrackingPage(QWidget* parent) : PageBase(parent), ui(new Ui::Track
     connect(ui->shapeMsSpin, &QSpinBox::editingFinished, this, &TrackingPage::computeShape);
     connect(ui->shapeChannelCombo, &QComboBox::currentIndexChanged, this, [this](int i) {
         if (!readable(Receiver::StageTracked) || i < 0 || i >= int(rx_->trk.size())) return;
-        const int n = rx_->trk[size_t(i)].numMs;
+        const int n = rx_->trk[size_t(i)].numMs * rx_->trk[size_t(i)].periodMs;
         ui->shapeMsSlider->setRange(0, std::max(0, n - 1));
         ui->shapeMsSpin->setRange(0, std::max(0, n - 1));
     });
@@ -92,7 +92,8 @@ void TrackingPage::refresh()
     if (cc->count() > 0) {
         cc->setCurrentIndex(std::clamp(keep, 0, cc->count() - 1));
         sc->setCurrentIndex(cc->currentIndex());
-        const int n = rx_->trk[size_t(sc->currentIndex())].numMs;
+        const TrackingChannel& shapeCh = rx_->trk[size_t(sc->currentIndex())];
+        const int n = shapeCh.numMs * shapeCh.periodMs;
         ui->shapeMsSlider->setRange(0, std::max(0, n - 1));
         ui->shapeMsSpin->setRange(0, std::max(0, n - 1));
         if (ui->shapeMsSpin->value() == 0) ui->shapeMsSpin->setValue(std::min(n - 1, 5000));
@@ -126,7 +127,7 @@ void TrackingPage::showChannel()
     if (!t.valid) return;
     const ReceiverSettings& s = rx_->settings;
     const int n = t.numMs;
-    const QVector<double> x = range(n, 1e-3);
+    const QVector<double> x = range(n, t.periodMs * 1e-3);
     const QColor cI(31, 119, 180), cQ(214, 39, 40), cG(44, 160, 44), cP(148, 103, 189), cO(255, 127, 14);
 
     // constellation
@@ -139,7 +140,7 @@ void TrackingPage::showChannel()
     iq->addSeries(tr("prompt"), ix, qy, PlotWidget::Points, cI);
     iq->series(0).pointSize = 2;
     iq->series(0).sorted = false;
-    iq->setTitle(tr("Prompt (I, Q) scatter, PRN %1 (%2 points)").arg(t.prn).arg(ix.size()));
+    iq->setTitle(tr("Prompt (I, Q) scatter, %1 (%2 points)").arg(satName(t.prn)).arg(ix.size()));
     iq->autoScale();
 
     ui->promptPlot->addSeries(tr("I_P"), x, toQ(t.IP), PlotWidget::Lines, cI, 1.0);
@@ -174,7 +175,7 @@ void TrackingPage::showChannel()
     ui->adrPlot->addSeries(tr("ADR"), x, toQ(t.adr), PlotWidget::Lines, cI, 1.2);
     QVector<double> dr(n);
     const double spms = s.samplingFreq / 1000.0, spc = s.samplingFreq / kCaChipRate;
-    for (int k = 0; k < n; ++k) dr[k] = (t.codeEpochSample[size_t(k)] - t.codeEpochSample[0] - k * spms) / spc;
+    for (int k = 0; k < n; ++k) dr[k] = (t.codeEpochSample[size_t(k)] - t.codeEpochSample[0] - k * t.periodMs * spms) / spc;
     ui->driftPlot->addSeries(tr("code epoch drift"), x, dr, PlotWidget::Lines, cG, 1.2);
 }
 
@@ -186,9 +187,9 @@ void TrackingPage::fillAllChannels()
     for (size_t i = 0; i < rx_->trk.size(); ++i) {
         const TrackingChannel& t = rx_->trk[i];
         if (!t.valid) continue;
-        const QVector<double> x = range(t.numMs, 1e-3);
+        const QVector<double> x = range(t.numMs, t.periodMs * 1e-3);
         const QColor c = seriesColor(int(i));
-        const QString name = tr("PRN %1").arg(t.prn);
+        const QString name = satName(t.prn);
         ui->allCn0Plot->addSeries(name, x, toQ(t.cn0), PlotWidget::Lines, c, 1.2);
         ui->allDopplerPlot->addSeries(name, x, toQ(t.carrFreq, 1.0, -fif), PlotWidget::Lines, c, 1.2);
         ui->allPliPlot->addSeries(name, x, toQ(t.pli), PlotWidget::Lines, c, 1.0);
@@ -196,7 +197,7 @@ void TrackingPage::fillAllChannels()
         for (int k = 0; k + 100 <= t.numMs; k += 100) {
             double a = 0;
             for (int j = 0; j < 100; ++j) a += t.dllDisc[size_t(k + j)];
-            bx << (k + 50) * 1e-3;
+            bx << (k + 50) * t.periodMs * 1e-3;
             by << a / 100.0;
         }
         ui->allDllPlot->addSeries(name, bx, by, PlotWidget::Lines, c, 1.2);
@@ -219,17 +220,17 @@ void TrackingPage::fillSummary()
         const TrackingChannel& t = rx_->trk[size_t(i)];
         sum->setNum(i, 0, t.channel, 0);
         sum->setKey(i, i);
-        sum->setNum(i, 1, t.prn, 0);
+        sum->setText(i, 1, satLabel(t.prn));
         sum->setText(i, 2, t.status, t.lockFraction > 0.9 ? goodColor() : warnColor());
         sum->setNum(i, 3, double(t.startSample), 0);
-        sum->setNum(i, 4, t.numMs, 0);
+        sum->setNum(i, 4, t.numMs * t.periodMs, 0);
         sum->setNum(i, 5, t.initCarrFreq, 2);
         sum->setNum(i, 6, t.initCarrFreq - s.ifFreq, 2);
         sum->setNum(i, 7, t.finalDoppler, 2);
-        const int from = std::min(t.numMs - 1, std::max(0, s.bitSyncStartMs));
+        const int from = std::min(t.numMs - 1, std::max(0, s.bitSyncStartMs / t.periodMs));
         double rate = 0, mn = 1e9, ep = 0, ed = 0;
         int cnt = 0;
-        if (t.numMs > from + 1000) rate = (t.carrFreq.back() - t.carrFreq[size_t(from)]) / ((t.numMs - 1 - from) * 1e-3);
+        if (t.numMs > from + 1000 / t.periodMs) rate = (t.carrFreq.back() - t.carrFreq[size_t(from)]) / ((t.numMs - 1 - from) * t.periodMs * 1e-3);
         for (int k = std::max(0, from); k < t.numMs; ++k) {
             mn = std::min(mn, double(t.cn0[size_t(k)]));
             ep += double(t.pllDisc[size_t(k)]) * t.pllDisc[size_t(k)];
@@ -282,8 +283,8 @@ void TrackingPage::computeShape()
     const int ci = ui->shapeChannelCombo->currentIndex();
     if (!readable(Receiver::StageTracked) || ci < 0 || ci >= int(rx_->trk.size())) return;
     const TrackingChannel& t = rx_->trk[size_t(ci)];
-    const int ms = std::clamp(ui->shapeMsSpin->value(), 0, t.numMs - 1);
-    const int avg = ui->avgSpin->value();
+    const int ms = std::clamp(ui->shapeMsSpin->value() / t.periodMs, 0, t.numMs - 1);   // tracking index
+    const int avg = std::max(1, ui->avgSpin->value() / t.periodMs);
     QApplication::setOverrideCursor(Qt::WaitCursor);
     const auto pts = Tracking::correlationShape(rx_->source, rx_->settings, t, ms, ui->spanSpin->value(), ui->tapsSpin->value(), avg);
     QApplication::restoreOverrideCursor();
@@ -312,11 +313,12 @@ void TrackingPage::computeShape()
         l += std::hypot(t.IL[size_t(k)], t.QL[size_t(k)]);
     }
     const int cnt = std::max(1, last - ms);
-    const double d = rx_->settings.dllSpacing;
+    const double d = isGalileo(t.prn) ? rx_->settings.galDllSpacing : rx_->settings.dllSpacing;
     sp->addSeries(tr("tracking E / P / L"), {-d, 0.0, d}, {l / cnt, p / cnt, e / cnt}, PlotWidget::Points, QColor(255, 127, 14));
     sp->series(sp->seriesCount() - 1).pointSize = 9;
     sp->addVLine(0, QColor(127, 127, 127), tr("prompt"), Qt::DotLine);
-    sp->setTitle(tr("PRN %1 correlation function at t = %2 s (averaged over %3 ms)").arg(t.prn).arg(ms * 1e-3, 0, 'f', 3).arg(cnt));
+    sp->setTitle(tr("%1 correlation function at t = %2 s (averaged over %3 ms)").arg(satName(t.prn))
+                     .arg(ms * t.periodMs * 1e-3, 0, 'f', 3).arg(cnt * t.periodMs));
     ui->shapeInfoLabel->setText(tr("Carrier %1 Hz, code %2 chips/s, code phase at block start %3 chips, carrier phase %4 cycles, "
                                    "block of %5 samples starting at sample %6. The asymmetry |E| - |L| drives the DLL; "
                                    "the rounded peak reflects the front-end bandwidth.")

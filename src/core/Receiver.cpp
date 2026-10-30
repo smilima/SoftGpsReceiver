@@ -80,8 +80,12 @@ bool Receiver::runAcquisition()
     clearCancel();
     QElapsedTimer t;
     t.start();
-    log(QStringLiteral("Acquisition: %1 PRNs, +/-%2 Hz in %3 Hz steps, %4 ms non-coherent")
-            .arg(settings.prnList().size()).arg(settings.acqSearchBand).arg(settings.acqStep).arg(settings.acqNonCoherent));
+    if (settings.useGps())
+        log(QStringLiteral("GPS acquisition: %1 PRNs, +/-%2 Hz in %3 Hz steps, %4 ms non-coherent")
+                .arg(settings.prnList().size()).arg(settings.acqSearchBand).arg(settings.acqStep).arg(settings.acqNonCoherent));
+    if (settings.useGalileo())
+        log(QStringLiteral("Galileo acquisition: E1-B and E1-C of %1 satellites, %2 x 4 ms non-coherent")
+                .arg(kGalileoMaxSv).arg(settings.galNonCoherent));
     emit progressChanged(QStringLiteral("Acquisition"), 0);
     acq = Acquisition::run(source, settings, &cancel_, [this](int p) { emit progressChanged(QStringLiteral("Acquisition"), p); });
     trk.clear(); nav.clear(); pvt = PvtOutput(); gnav = GlobalNavData();
@@ -92,7 +96,7 @@ bool Receiver::runAcquisition()
     }
     QStringList found;
     for (const auto& r : acq.results)
-        if (r.acquired) found << QStringLiteral("%1 (%2)").arg(r.prn).arg(r.metric, 0, 'f', 1);
+        if (r.acquired) found << QStringLiteral("%1 (%2)").arg(isGalileo(r.prn) ? satName(r.prn) : QString::number(r.prn)).arg(r.metric, 0, 'f', 1);
     log(QStringLiteral("Acquisition finished in %1 s: %2 satellites acquired: %3")
             .arg(acq.elapsedSec, 0, 'f', 2).arg(found.size()).arg(found.join(", ")));
     stage_ = StageAcquired;
@@ -110,8 +114,15 @@ bool Receiver::runTracking()
     std::vector<const AcqResult*> sel;
     for (const auto& r : acq.results)
         if (r.acquired) sel.push_back(&r);
-    std::sort(sel.begin(), sel.end(), [](const AcqResult* a, const AcqResult* b) { return a->metric > b->metric; });
-    if (int(sel.size()) > settings.numChannels) sel.resize(size_t(settings.numChannels));
+    // Strongest first, up to numChannels per constellation: the two metrics are not comparable
+    std::sort(sel.begin(), sel.end(), [](const AcqResult* a, const AcqResult* b) {
+        if (isGalileo(a->prn) != isGalileo(b->prn)) return isGalileo(b->prn);
+        return a->metric > b->metric;
+    });
+    int nGps = 0, nGal = 0;
+    sel.erase(std::remove_if(sel.begin(), sel.end(), [&](const AcqResult* r) {
+        return ++(isGalileo(r->prn) ? nGal : nGps) > settings.numChannels;
+    }), sel.end());
     if (sel.empty()) { log(QStringLiteral("No satellites to track")); return false; }
 
     trk.assign(sel.size(), TrackingChannel());
@@ -141,8 +152,8 @@ bool Receiver::runTracking()
     fut.waitForFinished();
     if (isCancelled()) { log(QStringLiteral("Tracking cancelled")); stage_ = StageAcquired; return false; }
     for (const auto& ch : trk)
-        log(QStringLiteral("  Ch %1 PRN %2: %3 ms, mean C/N0 %4 dB-Hz, phase lock %5 %, final Doppler %6 Hz, %7 s")
-                .arg(ch.channel).arg(ch.prn, 2).arg(ch.numMs).arg(ch.meanCn0, 0, 'f', 1)
+        log(QStringLiteral("  Ch %1 %2: %3 ms, mean C/N0 %4 dB-Hz, phase lock %5 %, final Doppler %6 Hz, %7 s")
+                .arg(ch.channel).arg(satName(ch.prn)).arg(ch.numMs * ch.periodMs).arg(ch.meanCn0, 0, 'f', 1)
                 .arg(ch.lockFraction * 100, 0, 'f', 1).arg(ch.finalDoppler, 0, 'f', 1).arg(ch.elapsedSec, 0, 'f', 1));
     stage_ = StageTracked;
     stageTime_[StageTracked] = t.elapsed() / 1000.0;
@@ -163,15 +174,23 @@ bool Receiver::runNavigation()
     QtConcurrent::blockingMap(idx, [&](const int& i) { nav[size_t(i)] = nav::decodeChannel(trk[size_t(i)], settings); });
     nav::collectGlobal(nav, gnav);
     for (const auto& n : nav) {
+        if (isGalileo(n.prn)) {
+            log(QStringLiteral("  %1: page sync %2, symbol SNR %3 dB, %4 of %5 I/NAV words pass the CRC, %6 TOW errors, %7")
+                    .arg(satName(n.prn)).arg(n.bitSyncOk ? "ok" : "FAILED").arg(n.bitSnrDb, 0, 'f', 1)
+                    .arg(n.parityOkWords).arg(n.parityTotalWords).arg(n.inavTowErrors).arg(n.status));
+            continue;
+        }
         int ok = 0;
         for (const auto& sf : n.subframes) ok += sf.allParityOk() ? 1 : 0;
-        log(QStringLiteral("  PRN %1: bit sync %2 (offset %3 ms, %4 %), bit SNR %5 dB, %6 subframes (%7 fully parity-OK), words %8/%9, %10")
-                .arg(n.prn, 2).arg(n.bitSyncOk ? "ok" : "FAILED").arg(n.bitOffset)
+        log(QStringLiteral("  %1: bit sync %2 (offset %3 ms, %4 %), bit SNR %5 dB, %6 subframes (%7 fully parity-OK), words %8/%9, %10")
+                .arg(satName(n.prn)).arg(n.bitSyncOk ? "ok" : "FAILED").arg(n.bitOffset)
                 .arg(n.bitSyncConfidence * 100, 0, 'f', 0).arg(n.bitSnrDb, 0, 'f', 1)
                 .arg(n.subframes.size()).arg(ok).arg(n.parityOkWords).arg(n.parityTotalWords).arg(n.status));
     }
     if (gnav.ionoUtc.valid) log(QStringLiteral("Ionospheric/UTC parameters decoded from PRN %1").arg(gnav.ionoUtc.sourcePrn));
     else log(QStringLiteral("Subframe 4 page 18 (iono/UTC) not in the recording - no ionospheric correction"));
+    if (gnav.galileo.ggtoValid)
+        log(QStringLiteral("Broadcast GPS-Galileo time offset: %1 ns").arg(gnav.galileo.a0g * 1e9, 0, 'f', 2));
     int nAlm = 0;
     for (int i = 1; i <= 32; ++i) nAlm += gnav.almanac[i].valid ? 1 : 0;
     log(QStringLiteral("Almanac entries decoded: %1").arg(nAlm));
@@ -197,6 +216,9 @@ bool Receiver::runPvt()
         emit stageCompleted(stage_);
         return false;
     }
+    if (pvt.nGps > 0 && pvt.nGalileo > 0)
+        log(QStringLiteral("Combined fix: %1 GPS and %2 Galileo satellites, mean Galileo-GPS bias %3 m")
+                .arg(pvt.nGps).arg(pvt.nGalileo).arg(pvt.meanIsb, 0, 'f', 2));
     log(QStringLiteral("Position: %1 valid fixes, lat %2 deg, lon %3 deg, h %4 m; std E/N/U = %5/%6/%7 m; mean PDOP %8")
             .arg(pvt.nValid)
             .arg(pvt.meanLlh.lat * 180.0 / kPi, 0, 'f', 7).arg(pvt.meanLlh.lon * 180.0 / kPi, 0, 'f', 7)

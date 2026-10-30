@@ -2,6 +2,7 @@
 #include "ui_NavMessagePage.h"
 #include "DataTable.h"
 #include "core/Constants.h"
+#include "core/GalileoNav.h"
 
 #include <QComboBox>
 #include <QFont>
@@ -52,11 +53,7 @@ NavMessagePage::NavMessagePage(QWidget* parent) : PageBase(parent), ui(new Ui::N
     ui->rightSplitter->setStretchFactor(0, 2);
     ui->rightSplitter->setStretchFactor(1, 2);
     ui->rightSplitter->setStretchFactor(2, 4);
-    ui->subframesTable->setColumns({tr("#"), tr("Start ms"), tr("Start bit"), tr("SF ID"), tr("Page"), tr("TOW count"),
-                                    tr("TOW at start (s)"), tr("Time of week"), tr("Parity"), tr("Polarity"), tr("Alert"),
-                                    tr("A-S"), tr("ISF"), tr("TOW consistent"), tr("Content")});
-    ui->wordsTable->setColumns({tr("Word"), tr("Name"), tr("Received D1..D30"), tr("Source data d1..d24"), tr("Hex (d1-d24)"),
-                                tr("D29* D30*"), tr("Parity received"), tr("Parity computed"), tr("Status")});
+    setSubframeColumns(false);
     QStringList bc;
     for (int i = 1; i <= 30; ++i) bc << QString::number(i);
     ui->bitmapTable->setColumns(bc);
@@ -82,7 +79,7 @@ void NavMessagePage::refresh()
     channel_->blockSignals(true);
     channel_->clear();
     if (readable(Receiver::StageDecoded))
-        for (const auto& n : rx_->nav) channel_->addItem(QStringLiteral("Ch %1 - PRN %2").arg(n.channel).arg(n.prn));
+        for (const auto& n : rx_->nav) channel_->addItem(QStringLiteral("Ch %1 - %2").arg(n.channel).arg(satName(n.prn)));
     channel_->blockSignals(false);
     if (channel_->count() > 0) channel_->setCurrentIndex(std::clamp(keep, 0, channel_->count() - 1));
     showChannel();
@@ -94,6 +91,27 @@ void NavMessagePage::selectPrn(int prn)
     if (!readable(Receiver::StageDecoded)) return;
     for (int i = 0; i < int(rx_->nav.size()); ++i)
         if (rx_->nav[size_t(i)].prn == prn) channel_->setCurrentIndex(i);
+}
+
+void NavMessagePage::setSubframeColumns(bool galileo)
+{
+    if (galileo) {
+        ui->subframesGroup->setTitle(tr("I/NAV words (select one)"));
+        ui->wordsGroup->setTitle(tr("Word: CRC-24Q over the even and odd page parts"));
+        ui->bitmapGroup->setTitle(tr("Bit map of the 128-bit word (colour = field, hover for its name, dark = word failed the CRC)"));
+        ui->subframesTable->setColumns({tr("#"), tr("Start ms"), tr("Word type"), tr("TOW at start (s)"), tr("Time of week"),
+                                        tr("CRC"), tr("Polarity"), tr("Content")});
+        ui->wordsTable->setColumns({tr("Type"), tr("Content"), tr("Word bits"), tr("Hex"), tr("Status")});
+    } else {
+        ui->subframesGroup->setTitle(tr("Subframes (select one)"));
+        ui->wordsGroup->setTitle(tr("Words: parity check per IS-GPS-200 Table 20-XIV (d = D xor D30*)"));
+        ui->bitmapGroup->setTitle(tr("Bit map of source data bits (colour = field, hover for its name, grey = parity, dark = word failed parity)"));
+        ui->subframesTable->setColumns({tr("#"), tr("Start ms"), tr("Start bit"), tr("SF ID"), tr("Page"), tr("TOW count"),
+                                        tr("TOW at start (s)"), tr("Time of week"), tr("Parity"), tr("Polarity"), tr("Alert"),
+                                        tr("A-S"), tr("ISF"), tr("TOW consistent"), tr("Content")});
+        ui->wordsTable->setColumns({tr("Word"), tr("Name"), tr("Received D1..D30"), tr("Source data d1..d24"), tr("Hex (d1-d24)"),
+                                    tr("D29* D30*"), tr("Parity received"), tr("Parity computed"), tr("Status")});
+    }
 }
 
 void NavMessagePage::showChannel()
@@ -111,6 +129,31 @@ void NavMessagePage::showChannel()
     const int ci = channel_->currentIndex();
     if (!readable(Receiver::StageDecoded) || ci < 0 || ci >= int(rx_->nav.size())) return;
     const NavChannel& n = rx_->nav[size_t(ci)];
+    setSubframeColumns(isGalileo(n.prn));
+    if (isGalileo(n.prn)) {
+        header_->setText(tr("   %1: %2 of %3 I/NAV words pass the CRC. %4")
+                             .arg(satName(n.prn)).arg(n.parityOkWords).arg(n.parityTotalWords).arg(n.status));
+        subframes_->beginFill(int(n.inavWords.size()));
+        for (int i = 0; i < int(n.inavWords.size()); ++i) {
+            const InavWord& w = n.inavWords[size_t(i)];
+            const QColor bg = w.crcOk ? QColor() : badColor();
+            subframes_->setNum(i, 0, i, 0, bg);
+            subframes_->setKey(i, i);
+            subframes_->setNum(i, 1, w.startMs * kE1CodeMs, 0);
+            subframes_->setNum(i, 2, w.type, 0);
+            subframes_->setText(i, 3, w.hasTow ? QString::number(w.tow, 'f', 0) : QStringLiteral("-"));
+            subframes_->setText(i, 4, w.hasTow ? nav::towText(w.tow) : QStringLiteral("-"));
+            subframes_->setText(i, 5, w.crcOk ? tr("OK") : tr("FAIL"), w.crcOk ? goodColor() : badColor());
+            subframes_->setText(i, 6, w.inverted ? tr("inverted") : tr("normal"));
+            subframes_->setText(i, 7, inav::wordDescription(w.type));
+        }
+        subframes_->endFill();
+        if (!n.inavWords.empty()) {
+            subframes_->selectRow(0);
+            showSubframe(0);
+        }
+        return;
+    }
     header_->setText(tr("   PRN %1: %2 subframes, %3/%4 words pass parity. %5")
                          .arg(n.prn).arg(n.subframes.size()).arg(n.parityOkWords).arg(n.parityTotalWords).arg(n.status));
     subframes_->beginFill(int(n.subframes.size()));
@@ -154,6 +197,10 @@ void NavMessagePage::showSubframe(int index)
     const int ci = channel_->currentIndex();
     if (!readable(Receiver::StageDecoded) || ci < 0 || ci >= int(rx_->nav.size())) return;
     const NavChannel& n = rx_->nav[size_t(ci)];
+    if (isGalileo(n.prn)) {
+        showInavWord(n, index);
+        return;
+    }
     if (index < 0 || index >= int(n.subframes.size())) return;
     const Subframe& sf = n.subframes[size_t(index)];
 
@@ -228,6 +275,73 @@ void NavMessagePage::showSubframe(int index)
         fields_->setText(i, 8, d.valueText);
         fields_->setText(i, 9, f.units);
         fields_->setText(i, 10, d.interpretation, f.kind == FieldKind::Parity && d.interpretation.contains("FAIL") ? badColor() : QColor());
+    }
+    fields_->endFill();
+}
+
+// One I/NAV word: 128 bits laid out like a GPS subframe, 30 to a row
+void NavMessagePage::showInavWord(const NavChannel& n, int index)
+{
+    if (index < 0 || index >= int(n.inavWords.size())) return;
+    DataTable* words_ = ui->wordsTable;
+    DataTable* bitmap_ = ui->bitmapTable;
+    DataTable* fields_ = ui->fieldsTable;
+    const InavWord& w = n.inavWords[size_t(index)];
+    const QColor bg = w.crcOk ? QColor() : badColor();
+    QFont mono(QStringLiteral("Consolas"));
+    mono.setStyleHint(QFont::Monospace);
+
+    QString bitText, hex;
+    for (int b = 0; b < 128; ++b) bitText += QLatin1Char(w.bits[size_t(b)] ? '1' : '0');
+    for (int b = 0; b < 128; b += 4) hex += QString::number(w.field(b, 4), 16).toUpper();
+    words_->beginFill(1);
+    words_->setNum(0, 0, w.type, 0, bg);
+    words_->setText(0, 1, inav::wordDescription(w.type), bg);
+    words_->setText(0, 2, bitText, bg);
+    words_->setText(0, 3, QStringLiteral("0x") + hex, bg);
+    words_->setText(0, 4, w.crcOk ? tr("CRC OK") : tr("CRC FAIL"), w.crcOk ? goodColor() : badColor());
+    if (QTableWidgetItem* it = words_->item(0, 2)) it->setFont(mono);
+    words_->endFill();
+
+    const auto fields = inav::decodeFields(w);
+    std::vector<int> owner(128, -1);
+    for (int i = 0; i < int(fields.size()); ++i)
+        for (int b = 0; b < fields[size_t(i)].def.l1; ++b) owner[size_t(fields[size_t(i)].def.s1 - 1 + b)] = i;
+
+    const int rows = 5;
+    bitmap_->setUpdatesEnabled(false);
+    bitmap_->beginFill(rows);
+    QStringList vh;
+    for (int r = 0; r < rows; ++r) vh << QString::number(r * 30 + 1);
+    bitmap_->setVerticalHeaderLabels(vh);
+    for (int pos = 0; pos < 128; ++pos) {
+        const int o = owner[size_t(pos)];
+        const QColor c = o >= 0 ? fieldColor(fields[size_t(o)].def, o) : QColor(255, 255, 255);
+        const QString tip = o >= 0 ? QStringLiteral("Bit %1\n%2").arg(pos + 1).arg(fields[size_t(o)].def.name)
+                                   : QStringLiteral("Bit %1").arg(pos + 1);
+        bitmap_->setText(pos / 30, pos % 30, QString::number(w.bits[size_t(pos)]), w.crcOk ? c : c.darker(130), tip);
+        bitmap_->item(pos / 30, pos % 30)->setTextAlignment(Qt::AlignCenter);
+    }
+    bitmap_->endFill(false);
+    for (int c = 0; c < 30; ++c) bitmap_->setColumnWidth(c, 26);
+    bitmap_->setUpdatesEnabled(true);
+
+    fields_->beginFill(int(fields.size()));
+    for (int i = 0; i < int(fields.size()); ++i) {
+        const DecodedField& d = fields[size_t(i)];
+        const NavFieldDef& f = d.def;
+        fields_->setText(i, 0, f.name, fieldColor(f, i));
+        fields_->setText(i, 1, QString::number(w.type));
+        fields_->setText(i, 2, QStringLiteral("%1-%2").arg(f.s1).arg(f.s1 + f.l1 - 1));
+        fields_->setNum(i, 3, f.totalBits(), 0);
+        fields_->setText(i, 4, d.bitString);
+        if (QTableWidgetItem* it = fields_->item(i, 4)) it->setFont(mono);
+        fields_->setText(i, 5, f.totalBits() <= 64 ? QString::number(d.raw) : QStringLiteral("-"));
+        fields_->setText(i, 6, f.isSigned ? QString::number(d.rawSigned) : QStringLiteral("-"));
+        fields_->setText(i, 7, f.scaleText);
+        fields_->setText(i, 8, d.valueText);
+        fields_->setText(i, 9, f.units);
+        fields_->setText(i, 10, d.interpretation);
     }
     fields_->endFill();
 }

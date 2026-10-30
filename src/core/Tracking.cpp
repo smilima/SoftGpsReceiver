@@ -1,6 +1,7 @@
 #include "Tracking.h"
 #include "CaCode.h"
 #include "Constants.h"
+#include "GalileoCodes.h"
 
 #include <QElapsedTimer>
 
@@ -46,14 +47,15 @@ inline uint32_t phaseToFixed(double cycles)
 // phase accumulator addressing a sine/cosine table; the code NCO is a
 // double-precision phase, sampled with a padded code table so that the
 // early and late replicas can run off either end of the code period.
-template <bool Complex>
+// With Data set, a second table supplies an extra prompt correlator (E1-B).
+template <bool Complex, bool Data>
 void correlate(const float* sI, const float* sQ, int n, double remCode, double codeStep, double d,
-               const float* codeP, double remCarr, double carrStep, float acc[6])
+               const float* codeP, const float* dataP, double remCarr, double carrStep, float acc[8])
 {
     const CarrierLut& L = lut();
     uint32_t ph = phaseToFixed(remCarr);
     const uint32_t dph = uint32_t(uint64_t(std::llround(frac(carrStep) * 4294967296.0)));
-    float ie = 0, qe = 0, ip = 0, qp = 0, il = 0, ql = 0;
+    float ie = 0, qe = 0, ip = 0, qp = 0, il = 0, ql = 0, ib = 0, qb = 0;
     for (int i = 0; i < n; ++i) {
         const double cp = remCode + double(i) * codeStep;
         const float ce = codeP[int(cp + d + 1.0)];
@@ -73,8 +75,27 @@ void correlate(const float* sI, const float* sQ, int n, double remCode, double c
         ie += ce * bi;  qe += ce * bq;
         ip += cpv * bi; qp += cpv * bq;
         il += cl * bi;  ql += cl * bq;
+        if (Data) {
+            const float db = dataP[int(cp + 1.0)];
+            ib += db * bi; qb += db * bq;
+        }
     }
-    acc[0] = ie; acc[1] = qe; acc[2] = ip; acc[3] = qp; acc[4] = il; acc[5] = ql;
+    acc[0] = ie; acc[1] = qe; acc[2] = ip; acc[3] = qp; acc[4] = il; acc[5] = ql; acc[6] = ib; acc[7] = qb;
+}
+
+// Replica table used by the correlators: one value per chip for C/A, two per chip for BOC(1,1)
+std::vector<int8_t> replicaTable(int prn, bool dataComponent)
+{
+    if (!isGalileo(prn)) return CaCode::chips(prn);
+    return GalileoCode::boc11(dataComponent ? GalileoCode::e1b(svidOf(prn)) : GalileoCode::e1c(svidOf(prn)));
+}
+
+std::vector<float> paddedTable(const std::vector<int8_t>& table)
+{
+    const int len = int(table.size());
+    std::vector<float> p(len + 3);
+    for (int k = 0; k < len + 3; ++k) p[k] = table[(k - 1 + len) % len];
+    return p;
 }
 
 inline double safeAtan(double num, double den)
@@ -90,6 +111,7 @@ void TrackingChannel::reserve(int n)
     blockStart.reserve(n); blockSize.reserve(n); codeEpochSample.reserve(n);
     carrFreq.reserve(n); codeFreq.reserve(n); remCarrPhase.reserve(n); remCodePhase.reserve(n);
     IE.reserve(n); IP.reserve(n); IL.reserve(n); QE.reserve(n); QP.reserve(n); QL.reserve(n);
+    if (isGalileo(prn)) { IB.reserve(n); QB.reserve(n); }
     pllDisc.reserve(n); fllDisc.reserve(n); dllDisc.reserve(n); carrNco.reserve(n); codeNco.reserve(n);
     cn0.reserve(n); pli.reserve(n); adr.reserve(n); lock.reserve(n);
 }
@@ -106,17 +128,22 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
     ch.prn = acq.prn;
     ch.startSample = startSample;
     ch.initCarrFreq = acq.fineFreq;
+    const bool gal = isGalileo(ch.prn);
+    const int periodMs = gal ? kE1CodeMs : 1;
+    const int codeLength = gal ? kE1CodeLength : kCaCodeLength;
+    const double tableScale = gal ? 2.0 : 1.0;            // table entries per chip
+    ch.periodMs = periodMs;
+    ch.codeLength = codeLength;
 
-    int maxMs = int(double(totalSamples - startSample) / (fs / 1000.0)) - 2;
+    int maxMs = int(double(totalSamples - startSample) / (fs / 1000.0)) - 2 * periodMs;
     if (s.msToProcess > 0) maxMs = std::min(maxMs, s.msToProcess);
+    maxMs /= periodMs;                                    // from here on "ms" counts code periods
     if (maxMs <= 0) { ch.status = QStringLiteral("No data"); return; }
     ch.reserve(maxMs);
 
-    // padded code: codeP[k] = chip[(k-1) mod 1023], index = floor(phase) + 1
-    const auto chips = CaCode::chips(ch.prn);
-    std::vector<float> codeP(kCaCodeLength + 3);
-    for (int k = 0; k < kCaCodeLength + 3; ++k)
-        codeP[k] = chips[(k - 1 + kCaCodeLength) % kCaCodeLength];
+    // padded code: codeP[k] = table[(k-1) mod length], index = floor(phase) + 1
+    const std::vector<float> codeP = paddedTable(replicaTable(ch.prn, false));
+    const std::vector<float> dataP = gal ? paddedTable(replicaTable(ch.prn, true)) : std::vector<float>();
 
     // ---- loop filter coefficients (2nd-order PLL + 1st-order FLL assist, 2nd-order DLL)
     const double zp = s.pllDamping;
@@ -126,37 +153,51 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
     const double wnd = s.dllBandwidth * 8.0 * zd / (4.0 * zd * zd + 1.0);
     ch.pllWn = wnp; ch.pllK1 = 2.0 * zp * wnp; ch.pllK2 = wnp * wnp; ch.fllW0 = w0f;
     ch.dllWn = wnd; ch.dllK1 = 2.0 * zd * wnd; ch.dllK2 = wnd * wnd;
-    const double d = s.dllSpacing;
+    const double d = gal ? s.galDllSpacing : s.dllSpacing;
     const double dopSign = s.dopplerSignValue();
+    // Discriminator gain. C/A: triangle R = 1 - |t|; BOC(1,1) near the peak: R = 1 - 3|t|
+    const double dllGain = gal ? (1.0 - 3.0 * d) / 3.0 : 1.0 - d;
 
     const double carrBase = acq.fineFreq;
     double carrFreq = carrBase;
-    double codeFreq = kCaChipRate;
+    // Code Doppler reaches about 2 chips/s. A narrow DLL would lag it by more than the width of the
+    // BOC(1,1) peak, so E1 always uses carrier aiding, from the first epoch on.
+    const bool aiding = gal || s.carrierAiding;
+    const double aidRef = s.ifFreq + (gal ? acq.commonDoppler : 0.0);
+    double codeFreq = kCaChipRate + (gal ? dopSign * (carrFreq - aidRef) / kCarrierToCode : 0.0);
     double remCode = 0.0, remCarr = 0.0;
     double carrInteg = 0.0, codeInteg = 0.0;
     double adr = 0.0;
     double sI2 = 0.0, sQ2 = 0.0;
     float prevI = 0, prevQ = 0;
     float cn0 = 0;
-    const int cn0Win = std::max(20, s.cn0WindowMs);
+    const int cn0Win = std::max(20, s.cn0WindowMs / periodMs);
     std::vector<double> pwr(cn0Win, 0.0);
     qint64 pos = startSample;
 
-    std::vector<float> bufI(size_t(fs / 1000.0 * 1.2) + 64), bufQ(bufI.size());
+    std::vector<float> bufI(size_t(periodMs * fs / 1000.0 * 1.2) + 64), bufQ(bufI.size());
     int reported = 0;
 
     for (int ms = 0; ms < maxMs; ++ms) {
         if (cancel && cancel->load(std::memory_order_relaxed)) { ch.status = QStringLiteral("Cancelled"); break; }
         const double codeStep = codeFreq / fs;
-        const int blk = int(std::ceil((double(kCaCodeLength) - remCode) / codeStep));
+        const int blk = int(std::ceil((double(codeLength) - remCode) / codeStep));
         if (blk <= 0 || pos + blk > totalSamples) break;
         if (size_t(blk) > bufI.size()) { bufI.resize(blk); bufQ.resize(blk); }
         src.read(pos, blk, bufI.data(), cpx ? bufQ.data() : nullptr);
 
         const double carrStep = carrFreq / fs;
-        float acc[6];
-        if (cpx) correlate<true>(bufI.data(), bufQ.data(), blk, remCode, codeStep, d, codeP.data(), remCarr, carrStep, acc);
-        else     correlate<false>(bufI.data(), nullptr, blk, remCode, codeStep, d, codeP.data(), remCarr, carrStep, acc);
+        const double tRem = remCode * tableScale, tStep = codeStep * tableScale, tD = d * tableScale;
+        float acc[8];
+        if (gal) {
+            if (cpx) correlate<true, true>(bufI.data(), bufQ.data(), blk, tRem, tStep, tD, codeP.data(), dataP.data(), remCarr, carrStep, acc);
+            else     correlate<false, true>(bufI.data(), nullptr, blk, tRem, tStep, tD, codeP.data(), dataP.data(), remCarr, carrStep, acc);
+            ch.IB.push_back(acc[6]);
+            ch.QB.push_back(acc[7]);
+        } else {
+            if (cpx) correlate<true, false>(bufI.data(), bufQ.data(), blk, tRem, tStep, tD, codeP.data(), nullptr, remCarr, carrStep, acc);
+            else     correlate<false, false>(bufI.data(), nullptr, blk, tRem, tStep, tD, codeP.data(), nullptr, remCarr, carrStep, acc);
+        }
         const float IE = acc[0], QE = acc[1], IP = acc[2], QP = acc[3], IL = acc[4], QL = acc[5];
         const double T = double(blk) / fs;
 
@@ -172,7 +213,7 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
         ch.QE.push_back(QE); ch.QP.push_back(QP); ch.QL.push_back(QL);
 
         // advance NCO phases to the start of the next block
-        remCode = remCode + blk * codeStep - kCaCodeLength;
+        remCode = remCode + blk * codeStep - codeLength;
         remCarr = frac(remCarr + carrFreq * blk / fs);
         adr += (carrFreq - s.ifFreq) * T;
         pos += blk;
@@ -186,7 +227,7 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
             efHz = safeAtan(cross, dot) / (kTwoPi * T);
         }
         prevI = IP; prevQ = QP;
-        const bool fllOn = ms < s.fllAssistMs;
+        const bool fllOn = ms * periodMs < s.fllAssistMs;
         carrInteg += T * (wnp * wnp * ep + (fllOn ? w0f * kTwoPi * efHz : 0.0));
         const double ncoHz = (carrInteg + 2.0 * zp * wnp * ep) / kTwoPi;
         carrFreq = carrBase + ncoHz;
@@ -194,10 +235,10 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
         // ---- code loop: normalised early-minus-late envelope DLL
         const double E = std::hypot(double(IE), double(QE));
         const double Lm = std::hypot(double(IL), double(QL));
-        const double ed = (E + Lm) > 0 ? (1.0 - d) * (E - Lm) / (E + Lm) : 0.0;  // chips
+        const double ed = (E + Lm) > 0 ? dllGain * (E - Lm) / (E + Lm) : 0.0;  // chips
         codeInteg += T * wnd * wnd * ed;
         const double codeNco = codeInteg + 2.0 * zd * wnd * ed;               // chips/s
-        const double aid = s.carrierAiding ? dopSign * (carrFreq - s.ifFreq) / kCarrierToCode : 0.0;
+        const double aid = aiding ? dopSign * (carrFreq - aidRef) / kCarrierToCode : 0.0;
         codeFreq = kCaChipRate + codeNco + aid;
 
         ch.pllDisc.push_back(float(ep));
@@ -215,11 +256,11 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
             m2 /= cn0Win; m4 /= cn0Win;
             const double pd = std::sqrt(std::max(0.0, 2.0 * m2 * m2 - m4));
             const double pn = m2 - pd;
-            if (pd > 0 && pn > 0) cn0 = float(10.0 * std::log10(pd / (pn * T)));
+            if (pd > 0 && pn > 0) cn0 = float(10.0 * std::log10(pd / (pn * T)) + (gal ? 3.01 : 0.0));   // the pilot has half the E1 power
             else if (pd > 0) cn0 = 60.0f;
             else cn0 = 0.0f;
         }
-        const double a = 0.02;
+        const double a = 0.02 * periodMs;
         sI2 = (1 - a) * sI2 + a * double(IP) * IP;
         sQ2 = (1 - a) * sQ2 + a * double(QP) * QP;
         const float pli = (sI2 + sQ2) > 0 ? float((sI2 - sQ2) / (sI2 + sQ2)) : 0.0f;
@@ -228,17 +269,17 @@ void Tracking::trackChannel(const SignalSource& src, const ReceiverSettings& s, 
         ch.lock.push_back(pli > 0.6f ? 1 : 0);
 
         if (msCounter && (ms - reported) >= 200) {
-            msCounter->fetch_add(ms - reported, std::memory_order_relaxed);
+            msCounter->fetch_add((ms - reported) * periodMs, std::memory_order_relaxed);
             reported = ms;
         }
     }
-    if (msCounter) msCounter->fetch_add(int(ch.IP.size()) - reported, std::memory_order_relaxed);
+    if (msCounter) msCounter->fetch_add((int(ch.IP.size()) - reported) * periodMs, std::memory_order_relaxed);
 
     ch.numMs = int(ch.IP.size());
     ch.valid = ch.numMs > 0;
     if (ch.status.isEmpty()) ch.status = ch.valid ? QStringLiteral("Tracked") : QStringLiteral("Failed");
     // summary
-    const int from = std::min(ch.numMs, std::max(0, s.bitSyncStartMs));
+    const int from = std::min(ch.numMs, std::max(0, s.bitSyncStartMs / periodMs));
     double sc = 0;
     int nl = 0, cnt = 0;
     for (int i = from; i < ch.numMs; ++i) { sc += ch.cn0[i]; nl += ch.lock[i]; ++cnt; }
@@ -255,7 +296,9 @@ std::vector<CorrShapePoint> Tracking::correlationShape(const SignalSource& src, 
     std::vector<CorrShapePoint> out;
     if (!ch.valid || ms < 0 || ms >= ch.numMs || taps < 2) return out;
     const double fs = s.samplingFreq;
-    const auto chips = CaCode::chips(ch.prn);
+    const std::vector<int8_t> table = replicaTable(ch.prn, false);
+    const int len = int(table.size());
+    const double tableScale = double(len) / ch.codeLength;
     out.resize(taps);
     for (int t = 0; t < taps; ++t) {
         out[t].offset = -span + 2.0 * span * t / (taps - 1);
@@ -281,10 +324,10 @@ std::vector<CorrShapePoint> Tracking::correlationShape(const SignalSource& src, 
             double ai = 0, aq = 0;
             for (int i = 0; i < blk; ++i) {
                 const double cp = ch.remCodePhase[m] + i * codeStep + out[t].offset;
-                int k = int(std::floor(cp)) % kCaCodeLength;
-                if (k < 0) k += kCaCodeLength;
-                ai += chips[k] * bi[i];
-                aq += chips[k] * bq[i];
+                int k = int(std::floor(cp * tableScale)) % len;
+                if (k < 0) k += len;
+                ai += table[k] * bi[i];
+                aq += table[k] * bq[i];
             }
             out[t].magnitude += std::hypot(ai, aq);
             out[t].inPhase += sgn * ai;

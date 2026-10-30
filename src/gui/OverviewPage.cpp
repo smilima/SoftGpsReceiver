@@ -96,15 +96,18 @@ void OverviewPage::refresh()
         if (done && rows[i].stage == Receiver::StageAcquired) {
             int n = 0;
             for (const auto& r : rx_->acq.results) n += r.acquired ? 1 : 0;
-            res = tr("%1 of %2 PRNs acquired").arg(n).arg(rx_->acq.results.size());
+            res = tr("%1 of %2 satellites acquired").arg(n).arg(rx_->acq.results.size());
         } else if (done && rows[i].stage == Receiver::StageTracked) {
             res = tr("%1 channels tracked").arg(rx_->trk.size());
         } else if (done && rows[i].stage == Receiver::StageDecoded) {
-            int eph = 0, sf = 0;
-            for (const auto& n : rx_->nav) { eph += n.eph.complete() ? 1 : 0; sf += int(n.subframes.size()); }
-            res = tr("%1 subframes decoded, %2 complete ephemerides").arg(sf).arg(eph);
+            int eph = 0, sf = 0, words = 0;
+            for (const auto& n : rx_->nav) { eph += n.eph.complete() ? 1 : 0; sf += int(n.subframes.size()); words += int(n.inavWords.size()); }
+            res = words ? tr("%1 subframes and %2 I/NAV words decoded, %3 complete ephemerides").arg(sf).arg(words).arg(eph)
+                        : tr("%1 subframes decoded, %2 complete ephemerides").arg(sf).arg(eph);
         } else if (done && rows[i].stage == Receiver::StageSolved) {
-            res = tr("%1 valid fixes").arg(rx_->pvt.nValid);
+            res = rx_->pvt.nGalileo > 0 && rx_->pvt.nGps > 0
+                      ? tr("%1 valid fixes from %2 GPS and %3 Galileo satellites").arg(rx_->pvt.nValid).arg(rx_->pvt.nGps).arg(rx_->pvt.nGalileo)
+                      : tr("%1 valid fixes").arg(rx_->pvt.nValid);
         } else if (!done && rows[i].stage == Receiver::StageSolved && st == Receiver::StageDecoded && !workerRunning()
                    && !rx_->pvt.error.isEmpty()) {
             res = rx_->pvt.error;
@@ -126,7 +129,7 @@ void OverviewPage::refresh()
     t->beginFill(int(list.size()));
     for (int i = 0; i < int(list.size()); ++i) {
         const AcqResult& a = *list[size_t(i)];
-        t->setNum(i, 0, a.prn, 0);
+        t->setText(i, 0, satLabel(a.prn));
         t->setKey(i, a.prn);
         t->setNum(i, 2, a.metric, 2);
         t->setNum(i, 3, a.cn0, 1);
@@ -140,18 +143,19 @@ void OverviewPage::refresh()
         t->setNum(i, 7, tc.lockFraction * 100, 1, tc.lockFraction > 0.9 ? goodColor() : badColor());
         if (st < Receiver::StageDecoded || ch >= int(rx_->nav.size())) continue;
         const NavChannel& n = rx_->nav[size_t(ch)];
-        t->setText(i, 8, n.bitSyncOk ? tr("ok (%1 ms)").arg(n.bitOffset) : tr("failed"), n.bitSyncOk ? goodColor() : badColor());
+        const bool gal = isGalileo(n.prn);
+        t->setText(i, 8, n.bitSyncOk ? (gal ? tr("page sync ok") : tr("ok (%1 ms)").arg(n.bitOffset)) : tr("failed"), n.bitSyncOk ? goodColor() : badColor());
         int ok = 0;
         for (const auto& sf : n.subframes) ok += sf.allParityOk() ? 1 : 0;
-        t->setText(i, 9, QStringLiteral("%1 / %2").arg(ok).arg(n.subframes.size()));
+        t->setText(i, 9, gal ? QStringLiteral("-") : QStringLiteral("%1 / %2").arg(ok).arg(n.subframes.size()));
         t->setText(i, 10, QStringLiteral("%1 / %2").arg(n.parityOkWords).arg(n.parityTotalWords),
                    n.parityOkWords == n.parityTotalWords && n.parityTotalWords > 0 ? goodColor() : warnColor());
         t->setText(i, 11, n.eph.complete() ? (n.eph.consistent() ? tr("complete") : tr("IODE mismatch")) : tr("incomplete"),
                    n.eph.complete() ? goodColor() : badColor());
         if (n.eph.sf1) {
             t->setText(i, 12, QString::number(n.eph.svHealth), n.eph.svHealth == 0 ? goodColor() : badColor(),
-                       nav::health6Text(n.eph.svHealth));
-            t->setText(i, 13, nav::uraText(n.eph.uraIndex));
+                       gal ? QString() : nav::health6Text(n.eph.svHealth));
+            t->setText(i, 13, gal ? tr("SISA %1").arg(n.eph.uraIndex) : nav::uraText(n.eph.uraIndex));
         }
         if (lastSol)
             for (const auto& o : lastSol->obs) {

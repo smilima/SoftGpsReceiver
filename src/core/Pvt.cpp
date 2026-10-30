@@ -64,6 +64,7 @@ void buildObservations(NavSolution& sol, const std::vector<int>& usable, const s
         o.prClockCorrected = o.rawPr + c * o.satClock;
 
         if (o.cn0 < s.minCn0) o.status = QStringLiteral("C/N0 %1 dB-Hz below threshold").arg(o.cn0, 0, 'f', 1);
+        else if (!n.verifiedAt(m + fr)) o.status = QStringLiteral("Tracking not verified: no decoded data passed its check near this epoch");
         else if (o.health != 0) o.status = QStringLiteral("SV unhealthy (health %1)").arg(o.health);
         else { o.available = true; o.status = QStringLiteral("OK"); }
         sol.obs.push_back(o);
@@ -71,8 +72,8 @@ void buildObservations(NavSolution& sol, const std::vector<int>& usable, const s
 }
 
 // Evaluates corrections, residuals and design matrix at position x / bias b.
-int evaluate(NavSolution& sol, const Vec3& x, double b, const ReceiverSettings& s, const GlobalNavData& g,
-             const std::vector<char>& include, std::vector<std::array<double, 4>>& H,
+int evaluate(NavSolution& sol, const Vec3& x, double b, double isb, const ReceiverSettings& s, const GlobalNavData& g,
+             const std::vector<char>& include, std::vector<std::array<double, 5>>& H,
              std::vector<double>& res, std::vector<double>& w, std::vector<int>& rows)
 {
     H.clear(); res.clear(); w.clear(); rows.clear();
@@ -98,10 +99,11 @@ int evaluate(NavSolution& sol, const Vec3& x, double b, const ReceiverSettings& 
         }
         o.correctedPr = o.prClockCorrected - o.tropo - o.iono;
         o.geomRange = r;
-        o.residual = o.correctedPr - r - b;
+        const double gal = isGalileo(o.prn) ? 1.0 : 0.0;
+        o.residual = o.correctedPr - r - b - gal * isb;
         o.weight = (s.elevationWeighting && posValid) ? std::max(0.01, std::pow(std::sin(o.el), 2)) : 1.0;
         const Vec3 u = (x - rot) / r;
-        H.push_back({u.x, u.y, u.z, 1.0});
+        H.push_back({u.x, u.y, u.z, 1.0, gal});
         res.push_back(o.residual);
         w.push_back(o.weight);
         rows.push_back(k);
@@ -109,42 +111,46 @@ int evaluate(NavSolution& sol, const Vec3& x, double b, const ReceiverSettings& 
     return int(rows.size());
 }
 
-bool solve4(const std::vector<std::array<double, 4>>& H, const std::vector<double>& y,
-            const std::vector<double>& w, double dx[4], Matrix* Q = nullptr)
+// Weighted least squares on the first 'states' columns of H
+template <size_t Cols>
+bool solveLsq(const std::vector<std::array<double, Cols>>& H, const std::vector<double>& y,
+              const std::vector<double>& w, int states, double* dx, Matrix* Q = nullptr)
 {
-    Matrix N(4, 4), Qm;
-    double rhs[4] = {0, 0, 0, 0};
+    Matrix N(states, states), Qm;
+    double rhs[Cols] = {};
     for (size_t r = 0; r < H.size(); ++r)
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < states; ++i) {
             rhs[i] += H[r][i] * w[r] * y[r];
-            for (int j = 0; j < 4; ++j) N(i, j) += H[r][i] * w[r] * H[r][j];
+            for (int j = 0; j < states; ++j) N(i, j) += H[r][i] * w[r] * H[r][j];
         }
     if (!N.inverse(&Qm)) return false;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < states; ++i) {
         dx[i] = 0;
-        for (int j = 0; j < 4; ++j) dx[i] += Qm(i, j) * rhs[j];
+        for (int j = 0; j < states; ++j) dx[i] += Qm(i, j) * rhs[j];
     }
     if (Q) *Q = Qm;
     return true;
 }
 
-bool positionFix(NavSolution& sol, Vec3 x, double b, const ReceiverSettings& s, const GlobalNavData& g, bool record)
+// 'states' is 4, or 5 when GPS and Galileo are mixed: the extra unknown is the bias between the two
+bool positionFix(NavSolution& sol, Vec3 x, double b, double isb, int states, const ReceiverSettings& s,
+                 const GlobalNavData& g, bool record)
 {
     std::vector<char> include(sol.obs.size(), 1);
-    std::vector<std::array<double, 4>> H;
+    std::vector<std::array<double, 5>> H;
     std::vector<double> res, w;
     std::vector<int> rows;
     sol.iterations.clear();
     bool converged = false;
     int maskPass = 0;
     for (int iter = 0; iter < 20; ++iter) {
-        const int n = evaluate(sol, x, b, s, g, include, H, res, w, rows);
-        if (n < 4) {
+        const int n = evaluate(sol, x, b, isb, s, g, include, H, res, w, rows);
+        if (n < states) {
             sol.message = QStringLiteral("Only %1 satellites available").arg(n);
             return false;
         }
-        double dx[4];
-        if (!solve4(H, res, w, dx)) {
+        double dx[5] = {};
+        if (!solveLsq(H, res, w, states, dx)) {
             sol.message = QStringLiteral("Singular geometry");
             return false;
         }
@@ -154,8 +160,10 @@ bool positionFix(NavSolution& sol, Vec3 x, double b, const ReceiverSettings& s, 
         li.dbias = dx[3];
         x += li.dpos;
         b += dx[3];
+        isb += dx[4];
         li.pos = x;
         li.bias = b;
+        li.isb = isb;
         li.stepNorm = li.dpos.norm();
         double ss = 0;
         for (double r : res) ss += r * r;
@@ -172,7 +180,7 @@ bool positionFix(NavSolution& sol, Vec3 x, double b, const ReceiverSettings& s, 
                 if (sol.obs[k].available && include[k]) ++remaining;
             for (size_t k = 0; k < sol.obs.size() && maskPass == 0; ++k) {
                 SatObservation& o = sol.obs[k];
-                if (o.available && include[k] && o.el * 180.0 / kPi < s.elevationMask && remaining > 4) {
+                if (o.available && include[k] && o.el * 180.0 / kPi < s.elevationMask && remaining > states) {
                     include[k] = 0;
                     --remaining;
                     o.status = QStringLiteral("Below elevation mask (%1 deg)").arg(o.el * 180.0 / kPi, 0, 'f', 1);
@@ -188,15 +196,16 @@ bool positionFix(NavSolution& sol, Vec3 x, double b, const ReceiverSettings& s, 
         return false;
     }
     // final evaluation, residuals and DOP
-    evaluate(sol, x, b, s, g, include, H, res, w, rows);
+    evaluate(sol, x, b, isb, s, g, include, H, res, w, rows);
     for (auto& o : sol.obs) o.used = false;
     for (int k : rows) sol.obs[size_t(k)].used = true;
     std::vector<double> ones(H.size(), 1.0);
-    double dummy[4];
+    double dummy[5];
     Matrix Q;
-    if (!solve4(H, res, ones, dummy, &Q)) return false;
+    if (!solveLsq(H, res, ones, states, dummy, &Q)) return false;
     sol.pos = x;
     sol.bias = b;
+    sol.isb = isb;
     sol.nUsed = int(rows.size());
     double ss = 0;
     for (double r : res) ss += r * r;
@@ -240,7 +249,7 @@ double velocityFix(NavSolution& sol, double sign, bool store)
     }
     if (rows.size() < 4) return -1;
     double x[4];
-    if (!solve4(H, y, w, x)) return -1;
+    if (!solveLsq(H, y, w, 4, x)) return -1;
     double ss = 0;
     for (size_t r = 0; r < rows.size(); ++r) {
         double pred = 0;
@@ -279,14 +288,16 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
     for (size_t i = 0; i < trk.size() && i < nav.size(); ++i) {
         const NavChannel& n = nav[i];
         if (!trk[i].valid) continue;
-        if (!n.timingValid) { out.log << QStringLiteral("PRN %1: no time reference (no verified subframe)").arg(n.prn); continue; }
-        if (!n.eph.complete()) { out.log << QStringLiteral("PRN %1: ephemeris incomplete").arg(n.prn); continue; }
-        if (!n.eph.consistent()) out.log << QStringLiteral("PRN %1: warning - IODE/IODC mismatch").arg(n.prn);
+        if (!n.timingValid) { out.log << QStringLiteral("%1: no time reference (no verified subframe or page)").arg(satName(n.prn)); continue; }
+        if (!n.eph.complete()) { out.log << QStringLiteral("%1: ephemeris incomplete").arg(satName(n.prn)); continue; }
+        if (!n.eph.consistent()) out.log << QStringLiteral("%1: warning - issue of data mismatch").arg(satName(n.prn));
         out.usableChannels.push_back(int(i));
-        if (out.weekNumber < 0) out.weekNumber = n.eph.weekNumber;
+        (isGalileo(n.prn) ? out.nGalileo : out.nGps)++;
+        if (out.weekNumber < 0) out.weekNumber = n.eph.weekNumber % 1024;
     }
-    if (out.usableChannels.size() < 4) {
-        out.error = QStringLiteral("Need at least 4 satellites with ephemeris and timing (have %1)").arg(out.usableChannels.size());
+    const int states = out.nGps > 0 && out.nGalileo > 0 ? 5 : 4;
+    if (int(out.usableChannels.size()) < states) {
+        out.error = QStringLiteral("Need at least %1 satellites with ephemeris and timing (have %2)").arg(states).arg(out.usableChannels.size());
         return out;
     }
 
@@ -295,7 +306,7 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
     double R1 = std::numeric_limits<double>::infinity();
     for (int i : out.usableChannels) {
         const auto& e = trk[size_t(i)].codeEpochSample;
-        const int k = std::clamp(s.bitSyncStartMs, 0, int(e.size()) - 2);
+        const int k = std::clamp(s.bitSyncStartMs / trk[size_t(i)].periodMs, 0, int(e.size()) - 2);
         R0 = std::max(R0, e[size_t(k)]);
         R1 = std::min(R1, e[e.size() - 2]);
     }
@@ -323,7 +334,7 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
         if (maxTx < -1e299) continue;
         sol.rxTime = maxTx + 0.0688;   // nominal ~69 ms travel time for the nearest satellite
         buildObservations(sol, out.usableChannels, trk, nav, s);
-        if (positionFix(sol, Vec3(), 0.0, s, gnav, false)) {
+        if (positionFix(sol, Vec3(), 0.0, 0.0, states, s, gnav, false)) {
             trxRef = sol.rxTime - sol.bias / c;
             Rref = epochs[e];
             haveRef = true;
@@ -338,7 +349,7 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
 
     // ---- all epochs
     Vec3 xPrev;
-    double bPrev = 0;
+    double bPrev = 0, isbPrev = 0;
     bool havePrev = false;
     bool signKnown = s.dopplerSign != DopplerSign::Auto;
     double sign = s.dopplerSignValue();
@@ -349,10 +360,11 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
         sol.rxSample = epochs[e];
         sol.rxTime = trxRef + (epochs[e] - Rref) / fs;
         buildObservations(sol, out.usableChannels, trk, nav, s);
-        const bool ok = positionFix(sol, havePrev ? xPrev : Vec3(), havePrev ? bPrev : 0.0, s, gnav, true);
+        const bool ok = positionFix(sol, havePrev ? xPrev : Vec3(), havePrev ? bPrev : 0.0, isbPrev, states, s, gnav, true);
         if (ok) {
             xPrev = sol.pos;
             bPrev = sol.bias;
+            isbPrev = sol.isb;
             havePrev = true;
             sol.gpsTime = sol.rxTime - sol.bias / c;
             if (!signKnown && sol.nUsed >= 5) {
@@ -395,9 +407,11 @@ PvtOutput solve(const std::vector<TrackingChannel>& trk, const std::vector<NavCh
         horiz.push_back(std::hypot(sol.enu.x, sol.enu.y));
         sph.push_back(sol.enu.norm());
         sp += sol.pdop; sh += sol.hdop; ns += sol.nUsed;
+        out.meanIsb += sol.isb;
         if (sol.velValid) { md += sol.drift; ++nd; }
     }
     const double N = double(valid.size());
+    out.meanIsb /= N;
     out.stdE = std::sqrt(se / N); out.stdN = std::sqrt(sn / N); out.stdU = std::sqrt(su / N);
     out.drms2 = 2.0 * std::sqrt((se + sn) / N);
     std::sort(horiz.begin(), horiz.end());

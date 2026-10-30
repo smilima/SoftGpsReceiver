@@ -41,6 +41,10 @@ void setWorkerRunning(bool on);
 
 QColor seriesColor(int i);
 QColor prnColor(int prn);
+// Satellite label for tables and plots: the number for a GPS PRN, "E30" for Galileo
+QString satLabel(int id);
+// Position on a per-satellite bar chart: GPS at its PRN, Galileo after a gap (E01 at 36)
+double satAxis(int id);
 QColor goodColor();
 QColor badColor();
 QColor warnColor();

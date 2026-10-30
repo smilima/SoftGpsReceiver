@@ -59,12 +59,13 @@ struct LsqIteration
     double bias = 0;
     Vec3 dpos;
     double dbias = 0;
+    double isb = 0;
     double stepNorm = 0;
     double rms = 0;
     int nSats = 0;
     std::vector<int> prns;
     std::vector<double> residuals;          // pre-fit residuals for this iteration
-    std::vector<std::array<double, 4>> H;   // design matrix rows
+    std::vector<std::array<double, 5>> H;   // design matrix rows (column 5 is used with two constellations)
 };
 
 struct NavSolution
@@ -77,6 +78,7 @@ struct NavSolution
     int nUsed = 0;
     Vec3 pos;
     double bias = 0;             // receiver clock bias (m)
+    double isb = 0;              // Galileo minus GPS: system time offset plus receiver delays (m)
     Geodetic llh;
     Vec3 enu;                    // relative to the mean position
     double gdop = 0, pdop = 0, hdop = 0, vdop = 0, tdop = 0;
@@ -102,6 +104,8 @@ struct PvtOutput
     double stdE = 0, stdN = 0, stdU = 0;
     double cep50 = 0, drms2 = 0, sep50 = 0;
     double meanPdop = 0, meanHdop = 0, meanSats = 0;
+    double meanIsb = 0;          // mean Galileo minus GPS bias (m), with both constellations
+    int nGps = 0, nGalileo = 0;  // usable satellites
     double biasDrift = 0;        // slope of the clock bias (m/s)
     double meanDrift = 0;        // mean Doppler-derived clock drift (m/s)
     double commonFreqOffset = 0; // Hz, as seen at IF

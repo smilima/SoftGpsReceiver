@@ -13,9 +13,13 @@ SatState satState(const Ephemeris& e, double t, std::vector<KeplerStep>* steps)
         if (steps) steps->push_back({QString::fromUtf8(sym), QString::fromUtf8(desc), v, QString::fromUtf8(units)});
     };
 
+    const bool gal = isGalileo(e.prn);
+    const double mu = gal ? kMuGal : kMu;
+    const double F = gal ? kRelFGal : kRelF;
+
     const double A = e.sqrtA * e.sqrtA;
     log("A", "Semi-major axis  A = (sqrt A)^2", A, "m");
-    const double n0 = std::sqrt(kMu / (A * A * A));
+    const double n0 = std::sqrt(mu / (A * A * A));
     log("n0", "Computed mean motion  n0 = sqrt(mu / A^3)", n0, "rad/s");
     const double tk = wrapHalfWeek(t - e.toe);
     log("t", "GPS time of transmission", t, "s");
@@ -86,9 +90,9 @@ SatState satState(const Ephemeris& e, double t, std::vector<KeplerStep>* steps)
 
     // clock
     const double dt = wrapHalfWeek(t - e.toc);
-    st.relativistic = kRelF * e.e * e.sqrtA * sinE;
+    st.relativistic = F * e.e * e.sqrtA * sinE;
     st.clockBias = e.af0 + e.af1 * dt + e.af2 * dt * dt + st.relativistic - e.tgd;
-    st.clockDrift = e.af1 + 2.0 * e.af2 * dt + kRelF * e.e * e.sqrtA * cosE * Edot;
+    st.clockDrift = e.af1 + 2.0 * e.af2 * dt + F * e.e * e.sqrtA * cosE * Edot;
     st.tk = tk;
     log("dtr", "Relativistic correction  F e sqrt(A) sin E", st.relativistic, "s");
     log("dtsv", "SV clock correction  af0 + af1 dt + af2 dt^2 + dtr - TGD", st.clockBias, "s");

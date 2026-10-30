@@ -31,6 +31,16 @@ QColor prnColor(int prn)
     return QColor::fromHsv((prn * 47) % 360, 200, 200);
 }
 
+QString satLabel(int id)
+{
+    return gnss::isGalileo(id) ? gnss::satName(id) : QString::number(id);
+}
+
+double satAxis(int id)
+{
+    return gnss::isGalileo(id) ? 35.0 + gnss::svidOf(id) : double(id);
+}
+
 QColor goodColor() { return QColor(170, 230, 170); }
 QColor badColor() { return QColor(245, 170, 170); }
 QColor warnColor() { return QColor(250, 225, 150); }
@@ -78,7 +88,7 @@ QLabel* valueLabel()
 
 QString channelLabel(const gnss::TrackingChannel& ch)
 {
-    return QStringLiteral("Ch %1 - PRN %2").arg(ch.channel).arg(ch.prn);
+    return QStringLiteral("Ch %1 - %2").arg(ch.channel).arg(gnss::satName(ch.prn));
 }
 
 } // namespace gui

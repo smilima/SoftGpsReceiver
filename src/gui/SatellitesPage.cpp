@@ -65,7 +65,7 @@ void SatellitesPage::refresh()
         ui->epochInfoLabel->setText(tr("(no position solution)"));
         return;
     }
-    for (int i : rx_->pvt.usableChannels) ui->prnCombo->addItem(tr("PRN %1").arg(rx_->nav[size_t(i)].prn), rx_->nav[size_t(i)].prn);
+    for (int i : rx_->pvt.usableChannels) ui->prnCombo->addItem(satName(rx_->nav[size_t(i)].prn), rx_->nav[size_t(i)].prn);
     ui->prnCombo->blockSignals(false);
     const int n = int(rx_->pvt.sols.size());
     ui->epochSlider->setRange(0, n - 1);
@@ -98,13 +98,13 @@ void SatellitesPage::fillTimePlots()
     int k = 0;
     for (const auto& kv : t) {
         const QColor c = prnColor(kv.first);
-        ui->elevationPlot->addSeries(tr("PRN %1").arg(kv.first), kv.second, el[kv.first], PlotWidget::Lines, c, 2.0);
-        ui->groundPlot->addSeries(tr("PRN %1").arg(kv.first), lon[kv.first], lat[kv.first], PlotWidget::LinesPoints, c, 2.0);
+        ui->elevationPlot->addSeries(satName(kv.first), kv.second, el[kv.first], PlotWidget::Lines, c, 2.0);
+        ui->groundPlot->addSeries(satName(kv.first), lon[kv.first], lat[kv.first], PlotWidget::LinesPoints, c, 2.0);
         auto& s = ui->groundPlot->series(ui->groundPlot->seriesCount() - 1);
         s.sorted = false;
         s.pointSize = 1.5;
         if (!lat[kv.first].isEmpty())
-            ui->groundPlot->addText(lon[kv.first].last(), lat[kv.first].last(), QString::number(kv.first), c);
+            ui->groundPlot->addText(lon[kv.first].last(), lat[kv.first].last(), satLabel(kv.first), c);
         ++k;
     }
     ui->elevationPlot->addHLine(rx_->settings.elevationMask, QColor(214, 39, 40), tr("mask"));
@@ -175,7 +175,7 @@ void SatellitesPage::showEpoch()
     int r = 0;
     for (const auto& o : sol->obs) {
         if (o.geomRange <= 0) continue;
-        t->setNum(r, 0, o.prn, 0);
+        t->setText(r, 0, satLabel(o.prn));
         t->setKey(r, o.prn);
         t->setText(r, 1, o.used ? tr("yes") : o.status, o.used ? goodColor() : warnColor());
         t->setNum(r, 2, o.satPosTx.x / 1000, 4);

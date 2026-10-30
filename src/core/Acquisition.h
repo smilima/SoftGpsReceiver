@@ -19,12 +19,13 @@ struct AcqResult
     double secondPeak = 0;
     double noiseMean = 0;
     double cn0 = 0;             // dB-Hz estimate from the correlation peak
-    int codePhase = 0;          // sample (within the 1-ms block) at which the C/A code starts
+    int codePhase = 0;          // sample (within the code period) at which the code starts
     double codePhaseChips = 0;
     double coarseFreq = 0;      // Hz (IF + Doppler bin)
     double fineFreq = 0;        // Hz after fine estimation
     double fineDelta = 0;       // fine - coarse (Hz)
     double doppler = 0;         // fineFreq - nominal IF
+    double commonDoppler = 0;   // Galileo only: Doppler shared by all satellites, i.e. the IF and clock error
     int peakBin = 0;
 
     // Diagnostics for display
@@ -32,6 +33,7 @@ struct AcqResult
     std::vector<float> surface;          // [bin * surfaceCols + col]
     std::vector<float> codeSlice;        // full resolution at the peak Doppler bin
     std::vector<float> dopplerSlice;     // per Doppler bin at the peak code phase
+    std::vector<double> binFreqs;        // Galileo only: its own Doppler bins (Hz); GPS shares the list in the output
     std::vector<double> fineAxis;        // Hz offset from the coarse frequency
     std::vector<float> fineSpectrum;     // spectrum of the squared (data-wiped) signal
 };

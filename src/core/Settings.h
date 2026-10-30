@@ -7,12 +7,20 @@ class QSettings;
 
 namespace gnss {
 
-enum class SampleFormat { Int8Real = 0, UInt8Real, Int16Real, Int8IQ, Int16IQ };
+// Packed2Real: 2-bit real samples, four per byte with the first sample in the low bits,
+// two's complement adjusted (00 = +1, 01 = +3, 10 = -3, 11 = -1).
+enum class SampleFormat { Int8Real = 0, UInt8Real, Int16Real, Int8IQ, Int16IQ, Packed2Real };
 QString sampleFormatName(SampleFormat f);
 
 // Sign relationship between the IF carrier offset and the true Doppler.
 // "Inverted" occurs with high-side LO injection in the front end.
 enum class DopplerSign { Auto = 0, Normal, Inverted };
+
+// Which signals are searched, tracked and used in the position fix.
+enum class Constellations { GpsGalileo = 0, GpsOnly, GalileoOnly };
+
+// "PRN 5" for GPS, "E30" for Galileo (see the satellite ids in Constants.h).
+QString satName(int id);
 
 struct ReceiverSettings
 {
@@ -23,9 +31,11 @@ struct ReceiverSettings
     double ifFreq = 9.55e6;             // Hz
     qint64 skipBytes = 0;
     int msToProcess = 0;                // 0 = whole file
+    Constellations constellations = Constellations::GpsGalileo;
 
     // ---------------- Acquisition
-    QVector<int> acqPrns;               // PRNs to search (empty = 1..32)
+    QVector<int> acqPrns;               // GPS PRNs to search (empty = 1..32)
+    int galNonCoherent = 8;             // number of 4-ms E1 correlations summed non-coherently
     int acqStartMs = 0;                 // where in the file the acquisition block starts
     double acqSearchBand = 10000.0;     // +/- Hz around the IF
     double acqStep = 500.0;             // Doppler bin width (Hz)
@@ -34,10 +44,11 @@ struct ReceiverSettings
     int fineFreqMs = 40;                // data used for fine frequency estimation
 
     // ---------------- Tracking
-    int numChannels = 12;
+    int numChannels = 12;               // per constellation
     double dllBandwidth = 2.0;          // Hz
     double dllDamping = 0.7;
     double dllSpacing = 0.5;            // early/late offset from prompt (chips)
+    double galDllSpacing = 0.15;        // same for E1: the BOC(1,1) peak is much narrower
     double pllBandwidth = 20.0;         // Hz
     double pllDamping = 0.7;
     double fllBandwidth = 10.0;         // Hz (FLL assist during pull-in)
@@ -60,9 +71,11 @@ struct ReceiverSettings
 
     int samplesPerCode() const;                   // samples in one C/A code period (rounded)
     bool isComplex() const;
-    int bytesPerSample() const;                   // per (complex) sample
+    int bytesPerSample() const;                   // per (complex) sample; 1 for packed samples
     QVector<int> prnList() const;
     double dopplerSignValue() const;              // +1 / -1 (Auto -> +1)
+    bool useGps() const { return constellations != Constellations::GalileoOnly; }
+    bool useGalileo() const { return constellations != Constellations::GpsOnly; }
 
     // Extract the sampling and IF frequencies from a file name such as
     // "GPSdata-DiscreteComponents-fs38_192-if9_55.bin" (values in MHz).

@@ -32,6 +32,8 @@ add_library(gnsscore STATIC
     src/core/SignalSource.h        src/core/SignalSource.cpp
     src/core/Fft.h                 src/core/Fft.cpp
     src/core/CaCode.h              src/core/CaCode.cpp
+    src/core/GalileoCodes.h        src/core/GalileoCodes.cpp
+    src/core/GalileoNav.h          src/core/GalileoNav.cpp
     src/core/SignalAnalysis.h      src/core/SignalAnalysis.cpp
     src/core/Acquisition.h         src/core/Acquisition.cpp
     src/core/Tracking.h            src/core/Tracking.cpp
@@ -105,3 +107,14 @@ endif()
 # ---------------------------------------------------------------------------
 qt_add_executable(gnss_cli src/cli/main_cli.cpp)
 target_link_libraries(gnss_cli PRIVATE gnsscore)
+
+# ---------------------------------------------------------------------------
+# Decoder test against the worked example in the Galileo ICD
+# ---------------------------------------------------------------------------
+option(GNSS_BUILD_TESTS "Build the self-contained tests" OFF)
+if(GNSS_BUILD_TESTS)
+    enable_testing()
+    qt_add_executable(test_galileo tests/test_galileo.cpp)
+    target_link_libraries(test_galileo PRIVATE gnsscore)
+    add_test(NAME test_galileo COMMAND test_galileo)
+endif()

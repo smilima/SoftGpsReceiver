@@ -1,7 +1,7 @@
 // Command-line front end: runs the full receiver pipeline on a recording and
 // prints the intermediate results. Useful for batch processing and testing.
 //
-//   gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--csv out.csv]
+//   gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--gnss all|gps|gal] [--csv out.csv]
 
 #include "core/Constants.h"
 #include "core/Geodesy.h"
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     QCoreApplication app(argc, argv);
     const QStringList args = app.arguments();
     if (args.size() < 2) {
-        out() << "usage: gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--csv out.csv]\n";
+        out() << "usage: gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--gnss all|gps|gal] [--csv out.csv]\n";
         return 1;
     }
     Receiver rx;
@@ -42,22 +42,34 @@ int main(int argc, char** argv)
         else if (args[i] == "--channels") rx.settings.numChannels = args[++i].toInt();
         else if (args[i] == "--fs") rx.settings.samplingFreq = args[++i].toDouble();
         else if (args[i] == "--if") rx.settings.ifFreq = args[++i].toDouble();
+        else if (args[i] == "--gnss") {
+            const QString g = args[++i];
+            rx.settings.constellations = g == "gps" ? Constellations::GpsOnly
+                                         : g == "gal" ? Constellations::GalileoOnly : Constellations::GpsGalileo;
+        }
         else if (args[i] == "--csv") csv = args[++i];
     }
 
     if (!rx.runAcquisition()) return 3;
     out() << "\n PRN  metric   code(samp)  Doppler(Hz)  fine-coarse  C/N0\n";
     for (const auto& r : rx.acq.results)
-        out() << QString::asprintf(" %3d  %6.2f  %10d  %11.1f  %11.1f  %5.1f %s\n", r.prn, r.metric, r.codePhase,
+        out() << QString::asprintf(" %3s  %6.2f  %10d  %11.1f  %11.1f  %5.1f %s\n",
+                                   qPrintable(isGalileo(r.prn) ? satName(r.prn) : QString::number(r.prn)), r.metric, r.codePhase,
                                    r.doppler, r.fineDelta, r.cn0, r.acquired ? "ACQ" : "");
     out().flush();
 
     if (!rx.runTracking()) return 4;
     if (!rx.runNavigation()) return 5;
     for (const auto& n : rx.nav) {
-        out() << QString::asprintf(" PRN %2d subframes:", n.prn);
-        for (const auto& sf : n.subframes)
-            out() << QString::asprintf(" %d%s(%d)", sf.id, sf.allParityOk() ? "" : "*", sf.towCount);
+        if (isGalileo(n.prn)) {
+            out() << QString::asprintf(" %s words:", qPrintable(satName(n.prn)));
+            for (size_t i = 0; i < n.inavWords.size() && i < 24; ++i)
+                out() << QString::asprintf(" %d%s", n.inavWords[i].type, n.inavWords[i].crcOk ? "" : "*");
+        } else {
+            out() << QString::asprintf(" PRN %2d subframes:", n.prn);
+            for (const auto& sf : n.subframes)
+                out() << QString::asprintf(" %d%s(%d)", sf.id, sf.allParityOk() ? "" : "*", sf.towCount);
+        }
         out() << "\n";
         if (n.eph.complete())
             out() << QString::asprintf("   WN %d toe %.0f toc %.0f IODE %d/%d IODC %d health %d URA %d e %.6f sqrtA %.3f\n",

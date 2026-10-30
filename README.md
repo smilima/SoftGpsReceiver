@@ -1,9 +1,10 @@
 # Software GPS Receiver (Qt)
 
-A post-processing GPS L1 C/A receiver for recorded IF sample files. It is built to show every step of the
-signal processing: raw-signal statistics, C/A code generation, acquisition, tracking loops, bit
-synchronisation, navigation-message decoding with parity, ephemeris/almanac/health, satellite orbits,
-pseudoranges, and the least-squares position/velocity/time solution.
+A post-processing GPS L1 C/A and Galileo E1 receiver for recorded IF sample files. It is built to show every
+step of the signal processing: raw-signal statistics, C/A code generation, acquisition, tracking loops, bit
+synchronisation, navigation-message decoding with parity or CRC, ephemeris/almanac/health, satellite orbits,
+pseudoranges, and the least-squares position/velocity/time solution. GPS and Galileo can be used alone or
+combined in one fix.
 
 ![Position page](docs/screenshots/17_Position_Summary__plots.png)
 
@@ -20,8 +21,11 @@ pseudoranges, and the least-squares position/velocity/time solution.
 5. Press **F5** (*Run all*), or run the stages one at a time with F6 (acquire), F7 (track), F8 (decode) and F9 (solve).
 
 The sampling frequency, IF and sample format come from the file name (`fs38_192` = 38.192 MHz,
-`if9_55` = 9.55 MHz, int8 real samples by default). You can change them in *File > Settings*, along with every
-acquisition, tracking-loop and navigation parameter.
+`if9_55` = 9.55 MHz, int8 real samples by default, packed 2-bit real samples if the name contains `2bit`). You can
+change them in *File > Settings*, along with every acquisition, tracking-loop and navigation parameter.
+
+*File > Settings* also selects **GPS + Galileo**, **GPS only** or **Galileo only**. Searching for Galileo adds several
+seconds to acquisition, so choose GPS only for a recording made before Galileo was operating.
 
 The file name gives the IF rounded to 9.55 MHz. The true IF of this recording is fs/4 = 9.548 MHz. The receiver
 copes either way, and the Position page reports the measured *effective IF* (9.547984 MHz) from the
@@ -59,7 +63,7 @@ Notes for editing:
   accesses them as `ui->name`.
 * Table **column headers are set in code** (`setColumns(...)` in each page's constructor), because the code fills
   the table by column index. Change the header list and the matching `setNum/setText` column numbers together.
-* The combo boxes in `SettingsDialog.ui` list their items in enum order (sample format, Doppler sign). Keep that order.
+* The combo boxes in `SettingsDialog.ui` list their items in enum order (sample format, Doppler sign, constellations). Keep that order.
 
 Plot interaction: mouse wheel zooms (Ctrl = x only, Shift = y only), left-drag box-zooms, right-drag pans,
 double-click resets, and right-click opens a menu (copy/save image, export CSV, legend, grid). The tracking-page
@@ -68,7 +72,7 @@ time axes are linked. Tables support Ctrl+C and *Export to CSV* from the context
 ## Command line
 
 ```
-gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--csv solutions.csv]
+gnss_cli <file.bin> [--ms N] [--channels N] [--fs Hz] [--if Hz] [--gnss all|gps|gal] [--csv solutions.csv]
 SoftGpsReceiver <file.bin> --screenshots <dir>   # process, save a PNG of every page and sub-tab, exit
 ```
 
@@ -86,6 +90,44 @@ SoftGpsReceiver <file.bin> --screenshots <dir>   # process, save a PNG of every 
   ionospheric correction is applied (residual RMS ≈ 5 m).
 
 Processing the whole file takes about 13 s on a 12-core CPU: acquisition 2 s, tracking 9 s with one thread per channel.
+With Galileo enabled, the search for it adds several seconds to acquisition.
+
+## Results with Galileo
+
+The GPS-only recordings above cannot exercise Galileo. The test recording is `IFEN_Bands-L1.stream` from the
+[ION GNSS SDR sample data](https://sdr.ion.org/api-sample-data.html): 18.6 minutes of packed 2-bit real samples at
+20.48 MHz with an IF of 5.5 MHz. It is not part of this repository. Save it as
+`IFEN_Bands-L1-fs20_48-if5_5-2bit.stream` and those settings are read from the name.
+
+The file's metadata gives 2016-01-19 at a fixed position. The navigation data shows that it was recorded on
+2017-02-06, near 48.08 N, 11.64 E, and that the receiver was in a vehicle moving at up to 14 m/s for much of the time.
+
+* 8 GPS and 5 Galileo satellites acquired (E02, E08, E19, E20, E30). E1-B and E1-C agree on delay and Doppler for all five.
+* 1860 of 2046 I/NAV words pass the CRC, with no TOW inconsistencies. The failures come from lost tracking, mostly late
+  in the recording, not from random errors.
+* E20 broadcasts only dummy words (type 63), so it is tracked and decoded but gives no ephemeris. The other four share
+  IODnav 91.
+
+For the first 58 s, while the vehicle is stationary:
+
+| Satellites | Latitude | Longitude | Height | std E/N/U | PDOP |
+|---|---|---|---|---|---|
+| 8 GPS | 48.0781398 | 11.6383598 | 601.73 m | 1.83 / 2.18 / 6.53 m | 1.88 |
+| 4 Galileo | 48.0781221 | 11.6383477 | 598.52 m | 1.77 / 2.98 / 1.85 m | 2.28 |
+| 8 GPS + 4 Galileo | 48.0781303 | 11.6383537 | 600.19 m | 1.44 / 2.00 / 4.24 m | 1.39 |
+
+The two independent solutions agree to about 3 m. The Galileo-GPS bias is 2.0 m, in line with the broadcast time offset of
+3.8 ns plus the different receiver delays of the two signals. Comparing the Galileo-only and GPS-only tracks epoch by epoch
+over the first 710 s, including driving, gives a mean difference of less than 1 m horizontally and 3.6 m vertically, and RMS
+differences of 2.8 m east and 3.4 m north. Galileo-only fixes are available for about 1000 of those 1420 epochs.
+
+After about 710 s every satellite weakens at once, at all elevations, most likely from obstructions along the route, and the
+weakest signals are lost. No Galileo-only fix is possible from then on: of the Galileo satellites only E30 and E20 stay
+tracked, and E20 has no ephemeris. The receiver has no outlier rejection, so the GPS and combined solutions then show 60 to
+80 jumps of up to about 100 m. There are none before that point.
+
+The whole recording takes about 3 minutes on a 12-core CPU and 6.5 GB of memory, most of it for the per-epoch tracking
+history. Limit *Data to process* for a quicker run.
 
 ## Screenshots
 
@@ -191,6 +233,17 @@ matrix and residuals, and the cofactor matrix in the local E/N/U/clock frame.
 
 ![Position - least-squares detail](docs/screenshots/19_Position_Least-squares_detail.png)
 
+### Galileo
+
+Sky plot with GPS and Galileo together, the BOC(1,1) correlation function measured on E30, with its negative side lobes,
+and the fields of an I/NAV word:
+
+![Sky plot with Galileo](docs/screenshots/20_Galileo_Sky_plot.png)
+
+![BOC(1,1) correlation function](docs/screenshots/21_Galileo_Correlator_shape.png)
+
+![I/NAV word](docs/screenshots/22_Galileo_Navigation_message.png)
+
 ## Code structure
 
 ```
@@ -207,8 +260,18 @@ src/core/            GUI-independent receiver (Qt Core + Concurrent only)
   Geodesy            ECEF/geodetic/ENU/UTM, az/el, Saastamoinen, Klobuchar, GPS time
   Pvt                pseudoranges, corrections, iterative least squares, DOP, Doppler velocity
   Receiver           pipeline orchestration (runs on a worker thread)
+  GalileoCodes       E1-B and E1-C primary codes (memory codes, from a table)
+  GalileoNav         I/NAV: page sync, deinterleaver, Viterbi decoder, CRC-24Q, word fields, ephemeris
 src/gui/             Qt Widgets front end (.ui forms + page classes, PlotWidget, SkyPlotWidget, DataTable)
 src/cli/             command-line front end
+tests/               decoder test against the worked example in the Galileo ICD (option GNSS_BUILD_TESTS)
 docs/algorithms.html algorithm description shown on the Overview page
 resources/           application icon (make_icon.py regenerates the .ico)
 ```
+
+## Acknowledgements
+
+The Galileo E1 primary codes come from Annex C of the European GNSS (Galileo) Open Service Signal-In-Space Interface
+Control Document, Issue 2.1, (c) European Union 2023, and are used under the Authorisation in its Annex H. The tables were
+transcribed from GNSS-DSP-tools and checked against GNSS-SDR, and the codes in use here are confirmed by correlating them
+with live signals. This project is not endorsed by the EU.

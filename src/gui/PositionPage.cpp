@@ -38,7 +38,7 @@ PositionPage::PositionPage(QWidget* parent) : PageBase(parent), ui(new Ui::Posit
                                tr("dX (m)"), tr("dY (m)"), tr("dZ (m)"), tr("dBias (m)"), tr("|dx| (m)"),
                                tr("Pre-fit residual RMS (m)"), tr("Latitude"), tr("Longitude"), tr("Height (m)")});
     ui->designTable->setColumns({tr("PRN"), tr("dr/dX"), tr("dr/dY"), tr("dr/dZ"), tr("dr/db"), tr("Residual (m)"),
-                                 tr("Weight"), tr("Elevation")});
+                                 tr("Weight"), tr("Elevation"), tr("dr/d(Galileo bias)")});
     ui->cofactorTable->setColumns({QString(), tr("E"), tr("N"), tr("U"), tr("clock")});
     connect(ui->epochSpin, &QSpinBox::valueChanged, this, &PositionPage::showEpoch);
     connect(ui->exportCsvButton, &QPushButton::clicked, this, &PositionPage::exportCsv);
@@ -108,8 +108,11 @@ void PositionPage::fillSummary()
     for (const auto& s : p.sols)
         if (s.velValid) { ve += s.velEnu.x; vn += s.velEnu.y; vu += s.velEnu.z; ++nv; }
     if (nv) ui->velValue->setText(tr("%1 / %2 / %3 m/s").arg(ve / nv, 0, 'f', 3).arg(vn / nv, 0, 'f', 3).arg(vu / nv, 0, 'f', 3));
-    ui->biasValue->setText(tr("%1 m/s = %2 ppb (sample clock frequency error)").arg(p.biasDrift, 0, 'f', 3)
-                               .arg(p.biasDrift / kSpeedOfLight * 1e9, 0, 'f', 2));
+    QString biasText = tr("%1 m/s = %2 ppb (sample clock frequency error)").arg(p.biasDrift, 0, 'f', 3)
+                           .arg(p.biasDrift / kSpeedOfLight * 1e9, 0, 'f', 2);
+    if (p.nGps > 0 && p.nGalileo > 0)
+        biasText += tr("; Galileo-GPS bias %1 m (%2 GPS + %3 Galileo satellites)").arg(p.meanIsb, 0, 'f', 2).arg(p.nGps).arg(p.nGalileo);
+    ui->biasValue->setText(biasText);
     ui->driftValue->setText(tr("%1 m/s").arg(p.meanDrift, 0, 'f', 3));
     ui->ifValue->setText(tr("%1 MHz (nominal %2 MHz, offset %3 Hz)").arg(p.effectiveIf / 1e6, 0, 'f', 6)
                              .arg(rx_->settings.ifFreq / 1e6, 0, 'f', 6).arg(p.commonFreqOffset, 0, 'f', 1));
@@ -267,7 +270,7 @@ void PositionPage::showEpoch()
     for (const auto& o : s.obs) {
         if (!o.used) continue;
         const Vec3 u = (s.pos - o.satPos) / (s.pos - o.satPos).norm();
-        dt->setNum(r, 0, o.prn, 0);
+        dt->setText(r, 0, satLabel(o.prn));
         dt->setNum(r, 1, u.x, 6);
         dt->setNum(r, 2, u.y, 6);
         dt->setNum(r, 3, u.z, 6);
@@ -275,6 +278,7 @@ void PositionPage::showEpoch()
         dt->setNum(r, 5, o.residual, 3);
         dt->setNum(r, 6, o.weight, 3);
         dt->setNum(r, 7, o.el * 180 / kPi, 2);
+        dt->setNum(r, 8, isGalileo(o.prn) && rx_->pvt.nGps > 0 ? 1.0 : 0.0, 1);
         ++r;
     }
     dt->endFill();

@@ -59,6 +59,8 @@ void SettingsDialog::load(const ReceiverSettings& s)
     QStringList p;
     for (int v : s.prnList()) p << QString::number(v);
     ui->prnsEdit->setText(p.size() == 32 ? QStringLiteral("1-32") : p.join(','));
+    ui->constellationCombo->setCurrentIndex(int(s.constellations));
+    ui->galNonCohSpin->setValue(s.galNonCoherent);
     ui->acqStartSpin->setValue(s.acqStartMs);
     ui->acqBandSpin->setValue(s.acqSearchBand);
     ui->acqStepSpin->setValue(s.acqStep);
@@ -73,6 +75,7 @@ void SettingsDialog::load(const ReceiverSettings& s)
     ui->dllBwSpin->setValue(s.dllBandwidth);
     ui->dllZetaSpin->setValue(s.dllDamping);
     ui->dllSpacingSpin->setValue(s.dllSpacing);
+    ui->galDllSpacingSpin->setValue(s.galDllSpacing);
     ui->aidingCheck->setChecked(s.carrierAiding);
     ui->cn0WinSpin->setValue(s.cn0WindowMs);
     ui->bitStartSpin->setValue(s.bitSyncStartMs);
@@ -105,6 +108,8 @@ ReceiverSettings SettingsDialog::settings() const
     }
     if (s.acqPrns.isEmpty())
         for (int p = 1; p <= 32; ++p) s.acqPrns.append(p);
+    s.constellations = Constellations(ui->constellationCombo->currentIndex());
+    s.galNonCoherent = ui->galNonCohSpin->value();
     s.acqStartMs = ui->acqStartSpin->value();
     s.acqSearchBand = ui->acqBandSpin->value();
     s.acqStep = ui->acqStepSpin->value();
@@ -119,6 +124,7 @@ ReceiverSettings SettingsDialog::settings() const
     s.dllBandwidth = ui->dllBwSpin->value();
     s.dllDamping = ui->dllZetaSpin->value();
     s.dllSpacing = ui->dllSpacingSpin->value();
+    s.galDllSpacing = ui->galDllSpacingSpin->value();
     s.carrierAiding = ui->aidingCheck->isChecked();
     s.cn0WindowMs = ui->cn0WinSpin->value();
     s.bitSyncStartMs = ui->bitStartSpin->value();

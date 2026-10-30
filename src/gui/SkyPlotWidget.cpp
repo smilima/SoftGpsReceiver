@@ -1,4 +1,5 @@
 #include "SkyPlotWidget.h"
+#include "GuiUtil.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -102,7 +103,7 @@ void SkyPlotWidget::paintEvent(QPaintEvent*)
         f.setBold(true);
         f.setPointSizeF(font().pointSizeF() * 0.85);
         p.setFont(f);
-        p.drawText(QRectF(q.x() - 10, q.y() - 10, 20, 20), Qt::AlignCenter, QString::number(s.prn));
+        p.drawText(QRectF(q.x() - 10, q.y() - 10, 20, 20), Qt::AlignCenter, satLabel(s.prn));
         p.setFont(font());
     }
     if (!title_.isEmpty()) {
@@ -120,7 +121,7 @@ void SkyPlotWidget::mouseMoveEvent(QMouseEvent* e)
     if (i >= 0) {
         const Sat& s = sats_[i];
         QToolTip::showText(e->globalPosition().toPoint(),
-                           QStringLiteral("PRN %1\naz %2°  el %3°\n%4").arg(s.prn).arg(s.az, 0, 'f', 1)
+                           QStringLiteral("%1\naz %2°  el %3°\n%4").arg(gnss::satName(s.prn)).arg(s.az, 0, 'f', 1)
                                .arg(s.el, 0, 'f', 1).arg(s.tip), this);
     } else {
         QToolTip::hideText();

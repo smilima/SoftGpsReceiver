@@ -94,7 +94,7 @@ void MeasurementsPage::fillPlots()
     for (const auto& kv : t) {
         const int prn = kv.first;
         const QColor c = prnColor(prn);
-        const QString name = tr("PRN %1").arg(prn);
+        const QString name = satName(prn);
         ui->prPlot->addSeries(name, kv.second, pr[prn], PlotWidget::Lines, c, 1.5);
         ui->residualPlot->addSeries(name, kv.second, res[prn], PlotWidget::LinesPoints, c, 1.2);
         ui->residualPlot->series(ui->residualPlot->seriesCount() - 1).pointSize = 2;
@@ -125,7 +125,7 @@ void MeasurementsPage::showEpoch()
     const double c = kSpeedOfLight;
     for (int r = 0; r < int(s.obs.size()); ++r) {
         const SatObservation& o = s.obs[size_t(r)];
-        t->setNum(r, 0, o.prn, 0);
+        t->setText(r, 0, satLabel(o.prn));
         t->setNum(r, 1, o.channel, 0);
         t->setText(r, 2, o.used ? tr("used") : o.status, o.used ? goodColor() : warnColor());
         t->setNum(r, 3, o.cn0, 1);

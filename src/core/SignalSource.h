@@ -40,6 +40,7 @@ private:
     qint64 skip_ = 0;
     qint64 numSamples_ = 0;
     int bytesPerSample_ = 1;
+    int samplesPerByte_ = 1;
     SampleFormat fmt_ = SampleFormat::Int8Real;
 };
 

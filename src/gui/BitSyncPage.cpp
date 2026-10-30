@@ -34,7 +34,7 @@ void BitSyncPage::refresh()
     channel_->blockSignals(true);
     channel_->clear();
     if (readable(Receiver::StageDecoded))
-        for (const auto& n : rx_->nav) channel_->addItem(QStringLiteral("Ch %1 - PRN %2").arg(n.channel).arg(n.prn));
+        for (const auto& n : rx_->nav) channel_->addItem(QStringLiteral("Ch %1 - %2").arg(n.channel).arg(satName(n.prn)));
     channel_->blockSignals(false);
     if (channel_->count() > 0) channel_->setCurrentIndex(std::clamp(keep, 0, channel_->count() - 1));
     showChannel();
@@ -68,33 +68,55 @@ void BitSyncPage::showChannel()
     const NavChannel& n = rx_->nav[size_t(ci)];
     const TrackingChannel& t = rx_->trk[size_t(ci)];
 
+    // Galileo sends one symbol per code period, so its histogram counts sync patterns per offset within a page part
+    const bool gal = isGalileo(n.prn);
+    ui->infoLabel->setText(gal ? tr("Symbols arrive one per 4 ms code period, so there is no bit synchronisation; pages are found by the sync pattern 0101100000 and confirmed by the CRC")
+                            : tr("Bit synchronisation by histogram of prompt sign changes (mod 20 ms); bits = sum of 20 prompt values; preamble 10001011 verified by TLM/HOW parity"));
+    const int nHist = gal ? kInavPartSymbols : 20;
+    std::vector<int> histCount(size_t(nHist), 0);
+    if (gal) for (int j : n.preambleMatches) histCount[size_t(j % nHist)]++;
+    else std::copy(n.transitionHist.begin(), n.transitionHist.end(), histCount.begin());
     QVector<double> hx, hy, bx, by;
-    for (int i = 0; i < 20; ++i) {
-        if (i == n.bitOffset) { bx << i; by << n.transitionHist[size_t(i)]; }
-        else { hx << i; hy << n.transitionHist[size_t(i)]; }
+    for (int i = 0; i < nHist; ++i) {
+        if (i == n.bitOffset) { bx << i; by << histCount[size_t(i)]; }
+        else { hx << i; hy << histCount[size_t(i)]; }
     }
     hist_->addSeries(tr("other offsets"), hx, hy, PlotWidget::Bars, QColor(160, 160, 160));
-    hist_->addSeries(tr("bit edge"), bx, by, PlotWidget::Bars, QColor(44, 160, 44));
+    hist_->addSeries(gal ? tr("page start") : tr("bit edge"), bx, by, PlotWidget::Bars, QColor(44, 160, 44));
     hist_->series(0).barWidth = hist_->series(1).barWidth = 0.75;
     hist_->autoScale();
+    hist_->setLabels(gal ? tr("Sync pattern matches per offset within a 250-symbol page part") : tr("Histogram of I_P sign transitions vs ms mod 20"),
+                     gal ? tr("Symbol offset") : tr("ms within the 20-ms bit"), gal ? tr("Matches") : tr("Transitions"));
+    soft_->setLabels(gal ? tr("E1-B symbols") : tr("Integrated (soft) navigation bits"),
+                     gal ? tr("Symbol index") : tr("Bit index"), gal ? tr("I_P (E1-B)") : tr("Sum of 20 I_P"));
+    pre_->setLabels(gal ? tr("Correlation of the symbols with the sync pattern 0101100000 (+/-10 = match, red = page part)")
+                        : tr("Correlation of the bit stream with the preamble (+/-8 = match, red = parity-verified subframe start)"),
+                    gal ? tr("Symbol index") : tr("Bit index"), tr("Correlation"));
 
     // I_P over the first 1 s after bit sync start, with bit boundaries
     const int a = std::max(0, n.firstBitMs - 40);
-    const int b = std::min(t.numMs, a + 1000);
+    const int b = std::min(t.numMs, a + (gal ? 2 * kInavPartSymbols : 1000));
     QVector<double> x, y;
-    for (int k = a; k < b; ++k) { x << k; y << t.IP[size_t(k)]; }
-    ip_->addSeries(tr("I_P"), x, y, PlotWidget::Steps, QColor(31, 119, 180), 1.0);
-    for (int k = n.firstBitMs; k < b; k += kMsPerBit) ip_->addVLine(k, QColor(214, 39, 40, 140), QString(), Qt::DotLine);
-    QVector<double> sx, sy;
-    for (int j = 0; j < int(n.softBits.size()); ++j) {
-        const int ms = n.firstBitMs + kMsPerBit * j;
-        if (ms < a) continue;
-        if (ms >= b) break;
-        sx << ms;
-        sy << n.softBits[size_t(j)] / kMsPerBit;
+    if (gal) {
+        for (int k = a; k < b; ++k) { x << k; y << t.IB[size_t(k)]; }
+        ip_->addSeries(tr("I_P (E1-B)"), x, y, PlotWidget::Steps, QColor(31, 119, 180), 1.0);
+        for (int k = n.firstBitMs + n.bitOffset; k < b; k += kInavPartSymbols) ip_->addVLine(k, QColor(214, 39, 40, 140), QString(), Qt::DotLine);
+        ip_->setTitle(tr("E1-B symbols with page part boundaries (first symbol at index %1, page offset %2 symbols)").arg(n.firstBitMs).arg(n.bitOffset));
+    } else {
+        for (int k = a; k < b; ++k) { x << k; y << t.IP[size_t(k)]; }
+        ip_->addSeries(tr("I_P"), x, y, PlotWidget::Steps, QColor(31, 119, 180), 1.0);
+        for (int k = n.firstBitMs; k < b; k += kMsPerBit) ip_->addVLine(k, QColor(214, 39, 40, 140), QString(), Qt::DotLine);
+        QVector<double> sx, sy;
+        for (int j = 0; j < int(n.softBits.size()); ++j) {
+            const int ms = n.firstBitMs + kMsPerBit * j;
+            if (ms < a) continue;
+            if (ms >= b) break;
+            sx << ms;
+            sy << n.softBits[size_t(j)] / kMsPerBit;
+        }
+        ip_->addSeries(tr("bit value / 20"), sx, sy, PlotWidget::Steps, QColor(255, 127, 14), 2.0);
+        ip_->setTitle(tr("Prompt I with bit boundaries (first bit at ms %1, offset %2 ms)").arg(n.firstBitMs).arg(n.bitOffset));
     }
-    ip_->addSeries(tr("bit value / 20"), sx, sy, PlotWidget::Steps, QColor(255, 127, 14), 2.0);
-    ip_->setTitle(tr("Prompt I with bit boundaries (first bit at ms %1, offset %2 ms)").arg(n.firstBitMs).arg(n.bitOffset));
 
     soft_->addSeries(tr("soft bits"), range(int(n.softBits.size())), toQ(n.softBits), PlotWidget::Points, QColor(148, 103, 189));
     soft_->series(0).pointSize = 2.5;
@@ -116,10 +138,11 @@ void BitSyncPage::showChannel()
     for (int j = 0; j < int(n.preambleCorr.size()); ++j) { px << j; py << n.preambleCorr[size_t(j)]; }
     for (int j : n.preambleVerified) { vx << j; vy << n.preambleCorr[size_t(j)]; }
     pre_->addSeries(tr("correlation"), px, py, PlotWidget::Lines, QColor(31, 119, 180), 0.8);
-    pre_->addSeries(tr("verified subframe starts"), vx, vy, PlotWidget::Points, QColor(214, 39, 40));
+    pre_->addSeries(gal ? tr("page parts") : tr("verified subframe starts"), vx, vy, PlotWidget::Points, QColor(214, 39, 40));
     pre_->series(1).pointSize = 7;
-    pre_->addHLine(8, QColor(44, 160, 44), "+8", Qt::DotLine);
-    pre_->addHLine(-8, QColor(44, 160, 44), "-8 (inverted)", Qt::DotLine);
+    const int full = gal ? 10 : 8;
+    pre_->addHLine(full, QColor(44, 160, 44), QStringLiteral("+%1").arg(full), Qt::DotLine);
+    pre_->addHLine(-full, QColor(44, 160, 44), QStringLiteral("-%1 (inverted)").arg(full), Qt::DotLine);
 
     summary_->beginFill(0);
     auto row = [&](const QString& k, const QString& v, const QColor& c = QColor()) {
@@ -130,7 +153,20 @@ void BitSyncPage::showChannel()
     };
     int total = 0;
     for (int v : n.transitionHist) total += v;
-    row(tr("PRN"), QString::number(n.prn));
+    row(tr("Satellite"), satName(n.prn));
+    if (gal) {
+        row(tr("Symbol rate"), tr("250 symbols/s: one per 4 ms code period, so no bit synchronisation is needed"));
+        row(tr("Page offset"), tr("%1 symbols").arg(n.bitOffset));
+        row(tr("Confidence"), tr("%1 % of sync pattern matches").arg(n.bitSyncConfidence * 100, 0, 'f', 1),
+            n.bitSyncOk ? goodColor() : badColor());
+        row(tr("Symbols"), QString::number(n.softBits.size()));
+        row(tr("Symbol SNR (mean^2/var)"), tr("%1 dB").arg(n.bitSnrDb, 0, 'f', 1));
+        row(tr("Raw symbol error rate"), QString::number(n.estimatedBer, 'g', 3));
+        row(tr("Sync pattern matches"), QString::number(n.preambleMatches.size()));
+        row(tr("Page parts with a clean sync"), QString::number(n.preambleVerified.size()),
+            n.preambleVerified.empty() ? badColor() : goodColor());
+        row(tr("Words passing the CRC"), QStringLiteral("%1 / %2").arg(n.parityOkWords).arg(n.parityTotalWords));
+    } else {
     row(tr("Histogram start"), tr("ms %1 (pull-in ignored)").arg(n.bitSyncStartMs));
     row(tr("Transitions counted"), QString::number(total));
     row(tr("Bit edge offset"), tr("%1 ms").arg(n.bitOffset));
@@ -144,6 +180,7 @@ void BitSyncPage::showChannel()
     row(tr("Parity-verified preambles"), QString::number(n.preambleVerified.size()),
         n.preambleVerified.empty() ? badColor() : goodColor());
     row(tr("Subframes decoded"), QString::number(n.subframes.size()));
+    }
     if (!n.subframes.empty())
         row(tr("Polarity"), n.subframes.front().inverted ? tr("inverted (PLL locked 180 deg)") : tr("normal"));
     row(tr("Status"), n.status);
@@ -151,7 +188,7 @@ void BitSyncPage::showChannel()
 
     // bit stream grid
     const int nb = int(n.hardBits.size());
-    const int phase = n.subframes.empty() ? 0 : n.subframes.front().startBit % 30;
+    const int phase = gal ? n.bitOffset % 30 : (n.subframes.empty() ? 0 : n.subframes.front().startBit % 30);
     const int rows = (nb - phase) / 30 + (phase > 0 ? 1 : 0);
     bits_->setUpdatesEnabled(false);
     bits_->beginFill(std::max(0, rows));
@@ -160,13 +197,13 @@ void BitSyncPage::showChannel()
     int r = 0;
     for (int start = phase > 0 ? phase - 30 : 0; start < nb && r < rows; start += 30, ++r) {
         bits_->setNum(r, 0, std::max(0, start), 0);
-        bits_->setNum(r, 1, n.firstBitMs + kMsPerBit * std::max(0, start), 0);
+        bits_->setNum(r, 1, (n.firstBitMs + (gal ? 1 : kMsPerBit) * std::max(0, start)) * t.periodMs, 0);
         for (int i = 0; i < 30; ++i) {
             const int j = start + i;
             if (j < 0 || j >= nb) continue;
             QColor bg = n.hardBits[size_t(j)] ? QColor(200, 220, 255) : QColor(255, 255, 255);
             bool inPre = false;
-            for (int k = 0; k < 8 && !inPre; ++k)
+            for (int k = 0; k < full && !inPre; ++k)
                 if (j - k >= 0 && preStart[size_t(j - k)]) inPre = true;
             if (inPre) bg = QColor(255, 210, 140);
             bits_->setText(r, 2 + i, QString::number(n.hardBits[size_t(j)]), bg);
