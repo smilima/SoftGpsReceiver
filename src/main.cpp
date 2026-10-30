@@ -1,6 +1,7 @@
 #include "gui/MainWindow.h"
 
 #include <QApplication>
+#include <QIcon>
 #include <QStyleFactory>
 
 // Usage:
@@ -13,6 +14,7 @@ int main(int argc, char* argv[])
     QCoreApplication::setApplicationName(QStringLiteral("SoftGpsReceiver"));
     QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
     app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    app.setWindowIcon(QIcon(QStringLiteral(":/resources/SoftGpsReceiver.ico")));
 
     QString file, shots;
     const QStringList args = app.arguments();

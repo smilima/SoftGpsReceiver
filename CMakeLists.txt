@@ -90,6 +90,13 @@ qt_add_resources(SoftGpsReceiver "docs"
     PREFIX "/"
     FILES docs/algorithms.html
 )
+qt_add_resources(SoftGpsReceiver "icon"
+    PREFIX "/"
+    FILES resources/SoftGpsReceiver.ico
+)
+if(WIN32)
+    target_sources(SoftGpsReceiver PRIVATE resources/SoftGpsReceiver.rc)    # icon of the .exe in Explorer
+endif()
 target_include_directories(SoftGpsReceiver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
 target_link_libraries(SoftGpsReceiver PRIVATE gnsscore Qt6::Widgets Qt6::Gui)
 endif()

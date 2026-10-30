@@ -210,4 +210,5 @@ src/core/            GUI-independent receiver (Qt Core + Concurrent only)
 src/gui/             Qt Widgets front end (.ui forms + page classes, PlotWidget, SkyPlotWidget, DataTable)
 src/cli/             command-line front end
 docs/algorithms.html algorithm description shown on the Overview page
+resources/           application icon (make_icon.py regenerates the .ico)
 ```
