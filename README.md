@@ -8,10 +8,48 @@ combined in one fix.
 
 ![Position page](docs/screenshots/17_Position_Summary__plots.png)
 
+## What to install
+
+Only Qt is needed to build the receiver and process recordings. The radio drivers are loaded when live mode starts, so
+each one is needed only for its radio.
+
+| What | Needed for | Where it goes | Where to get it |
+|---|---|---|---|
+| Qt 6 for MinGW 64-bit, with the MinGW compiler, CMake and Ninja | building | the Qt installer's folder | <https://www.qt.io/download> |
+| UHD | live mode from a USRP | its installer's folder, `C:\Program Files\UHD` | <https://files.ettus.com/binaries/uhd/> |
+| `hackrf.dll` and `libusb-1.0.dll` | live mode from a HackRF One | `third_party/hackrf/windows_x64/` | built from the HackRF sources: [Getting hackrf.dll](#getting-hackrfdll) |
+| `sm_api.dll` | live mode from a Signal Hound SM200 | `third_party/signal_hound/windows_x64/` | the [Signal Hound SDK](https://signalhound.com/software/signal-hound-software-development-kit-sdk/) |
+| Microsoft HTML Help Workshop | the help file, `SoftGpsReceiver.chm` | `C:\Program Files (x86)\HTML Help Workshop` | no longer offered by Microsoft |
+| Python 3 with NumPy and Pillow | only redrawing the icon (`resources/make_icon.py`) | | <https://www.python.org/>, then `pip install numpy pillow` |
+
+* **Qt.** Only Qt Base's modules are used (Core, Gui, Widgets, Concurrent and Network), so no add-ons are needed. The
+  receiver was written with Qt 6.11.2 and MinGW 13.1, in a static build of Qt, whose programs run on their own. The
+  installer's Qt is a shared build: the programs run from Qt Creator, and to run one anywhere else,
+  `windeployqt SoftGpsReceiver.exe` copies Qt's DLLs next to it.
+* **UHD** was 4.11.0 here. The receiver finds `uhd.dll` through `UHD_PKG_PATH`, in `C:\Program Files\UHD\bin` and on
+  `PATH`, or *Settings > Live* gives its path. [Setting up the N200](#setting-up-the-n200) covers the radio itself.
+* **HackRF.** `third_party/` holds nothing in git, so create the folder. One `hackrf.dll` serves SoftGpsReceiver and
+  GPSSim both. Windows 10 and later install the WinUSB driver a HackRF needs.
+* **Signal Hound.** Its licence restricts sharing the SDK's files, so `third_party/signal_hound/` is kept out of git. From the SDK, copy `device_apis/sm_series/lib/windows/vs2019_ver_<version>/x64/sm_api.dll` (2.3.10 here), or
+  give its path in *Settings > Live*. The SM200's own driver and firmware are on its
+  [download page](https://signalhound.com/support/product-downloads/sm200a-downloads/).
+* `uhd.dll` and `sm_api.dll` are built with Visual C++: if one will not load, install the
+  [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) for
+  x64.
+* CMake looks for the DLLs in `third_party/` when it configures, so run CMake again after adding them (*Build > Run
+  CMake* in Qt Creator). The build then copies them next to the programs.
+* **HTML Help Workshop.** Microsoft no longer offers its installer, `htmlhelp.exe`. Without it CMake reports *HTML Help
+  Workshop not found* and builds everything else, and *Help* says the file is missing.
+* **Recordings** are not in git either. `GPSdata-DiscreteComponents-fs38_192-if9_55.bin` and
+  `GPS_and_GIOVE_A-NN-fs16_3676-if4_1304.bin` come with the data of the textbook *A Software-Defined GPS and Galileo
+  Receiver* (Borre, Akos et al.), `IFEN_Bands-L1.stream` is from the ION sample data (see
+  [Results with Galileo](#results-with-galileo)), and the simulated GLONASS and Galileo recordings are made by the
+  tests. Put them in the folder that holds the checkout, where the program finds one by itself.
+
 ## Building and running in Qt Creator
 
 1. Open `CMakeLists.txt` in Qt Creator (*File > Open File or Project*).
-2. Select the **Desktop Qt 6.12.0 MinGW 64-bit** kit.
+2. Select a Qt 6 MinGW 64-bit kit (see [What to install](#what-to-install)).
 3. Choose the **Release** build configuration and press **Run** (Ctrl+R).
    Debug builds also work: the DSP core (`gnsscore`) is optimised even in Debug
    (option `GNSS_OPTIMIZE_CORE_IN_DEBUG`), so only the GUI is unoptimised.
@@ -126,16 +164,33 @@ fix 28 s after starting.
 With GPSSim on an N200 at 0 dB, through a cable into the HackRF at LNA 32 and VGA 30, all 9 satellites were tracked
 and the fix kept within 1.6 m (CEP50) of the simulated position.
 
-**Getting hackrf.dll.** The HackRF project ships no Windows build. Build `hackrf.dll` from
-<https://github.com/greatscottgadgets/hackrf> with the kit's MinGW; it needs `libusb.h` from libusb, of the version of
-the `libusb-1.0.dll` it will run with (UHD installs one, 1.0.29 with UHD 4.11):
+#### Getting hackrf.dll
 
-```bash
-gcc -O2 -shared -Ihackrf/host/libhackrf/src -Ilibusb-include hackrf/host/libhackrf/src/hackrf.c -o hackrf.dll -L"C:/Program Files/UHD/bin" -l:libusb-1.0.dll -static-libgcc -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
-```
+The HackRF project ships no Windows build of its library, so `hackrf.dll` is built from its sources with the kit's
+MinGW. It runs with UHD's `libusb-1.0.dll` (1.0.29 with UHD 4.11), and is compiled against libusb's header of the same
+version. Without UHD, take `libusb-1.0.dll` from the Windows binaries of a libusb release,
+<https://github.com/libusb/libusb/releases>, and give its folder to `-L` below.
 
-Put `hackrf.dll` and `libusb-1.0.dll` in `third_party/hackrf/windows_x64/`, and the build copies them next to the
-programs. The HackRF must use the WinUSB driver, which Windows 10 and later install for it.
+1. In an empty folder, get the HackRF sources and libusb's header. The tag is the version of `libusb-1.0.dll`, which
+   the DLL's *Properties > Details* shows:
+
+   ```bash
+   git clone https://github.com/greatscottgadgets/hackrf
+   ```
+
+   ```bash
+   git clone --depth 1 --branch v1.0.29 https://github.com/libusb/libusb
+   ```
+
+2. With the kit's MinGW on `PATH` (`C:\Qt\Tools\mingw1310_64\bin`), build it in that folder:
+
+   ```bash
+   gcc -O2 -shared -Ihackrf/host/libhackrf/src -Ilibusb/libusb hackrf/host/libhackrf/src/hackrf.c -o hackrf.dll -L"C:/Program Files/UHD/bin" -l:libusb-1.0.dll -static-libgcc -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
+   ```
+
+3. Copy `hackrf.dll` and `C:\Program Files\UHD\bin\libusb-1.0.dll` into `third_party/hackrf/windows_x64/` and run CMake
+   again. The build copies them next to the programs. The HackRF must use the WinUSB driver, which Windows 10 and later
+   install for it.
 
 ### Trying it without a radio
 
